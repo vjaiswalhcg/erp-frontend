@@ -118,7 +118,16 @@ async def delete_order(order_id: str, db: AsyncSession = Depends(deps.get_sessio
 async def update_order(
     order_id: str, payload: OrderUpdate, db: AsyncSession = Depends(deps.get_session)
 ):
-    order = await db.get(Order, order_id)
+    result = await db.execute(
+        select(Order)
+        .options(
+            selectinload(Order.lines),
+            selectinload(Order.customer),
+            selectinload(Order.lines).selectinload(OrderLine.product),
+        )
+        .where(Order.id == order_id)
+    )
+    order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
