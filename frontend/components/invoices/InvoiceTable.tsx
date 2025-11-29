@@ -69,11 +69,11 @@ export function InvoiceTable() {
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       draft: "secondary",
-      sent: "default",
+      posted: "default",
       paid: "default",
-      cancelled: "destructive",
+      written_off: "outline",
     };
     return <Badge variant={variants[status] || "default"}>{status}</Badge>;
   };

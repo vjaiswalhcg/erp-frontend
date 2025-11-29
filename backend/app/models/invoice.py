@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric
+from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 import enum
@@ -35,6 +35,7 @@ class Invoice(Base):
     subtotal: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
     tax_total: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     order = relationship("Order", back_populates="invoice")
     customer = relationship("Customer", back_populates="invoices")
@@ -52,9 +53,10 @@ class InvoiceLine(Base):
     invoice_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("invoice.id"), nullable=False
     )
-    product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("product.id"), nullable=False
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("product.id"), nullable=True
     )
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     quantity: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     unit_price: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)
     tax_rate: Mapped[float] = mapped_column(Numeric(5, 4), default=0)

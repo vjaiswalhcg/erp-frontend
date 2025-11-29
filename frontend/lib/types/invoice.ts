@@ -1,9 +1,15 @@
 export interface InvoiceLine {
   id: string;
-  description: string;
+  description: string | null;
+  product_id?: string | null;
   quantity: number;
   unit_price: number;
-  total: number;
+  tax_rate?: number;
+  line_total: number;
+  product?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface Invoice {
@@ -13,10 +19,10 @@ export interface Invoice {
   order_id: string | null;
   invoice_date: string;
   due_date: string | null;
-  status: string;
+  status: "draft" | "posted" | "paid" | "written_off";
   subtotal: number;
-  tax_amount: number;
-  total_amount: number;
+  tax_total: number;
+  total: number;
   currency: string;
   notes: string | null;
   lines?: InvoiceLine[];
@@ -32,20 +38,22 @@ export interface InvoiceCreate {
   order_id?: string;
   invoice_date?: string;
   due_date?: string;
-  status?: string;
-  tax_amount?: number;
+  status?: "draft" | "posted" | "paid" | "written_off";
+  tax_total?: number;
   currency?: string;
   notes?: string;
   lines: {
-    description: string;
+    description?: string;
+    product_id?: string | null;
     quantity: number;
     unit_price: number;
+    tax_rate?: number;
   }[];
 }
 
 export interface InvoiceUpdate {
   external_ref?: string;
   due_date?: string;
-  status?: string;
+  status?: "draft" | "posted" | "paid" | "written_off";
   notes?: string;
 }

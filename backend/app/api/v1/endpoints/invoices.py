@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +45,12 @@ async def create_invoice(
 
     order = None
     if payload.order_id:
-        order = await db.get(Order, payload.order_id)
+        result = await db.execute(
+            select(Order)
+            .options(selectinload(Order.lines))
+            .where(Order.id == payload.order_id)
+        )
+        order = result.scalar_one_or_none()
         if not order:
             raise HTTPException(status_code=400, detail="Invalid order")
 
@@ -80,18 +86,21 @@ async def create_invoice(
             normalized.append(line.dict())
 
     for line in normalized:
-        product = await db.get(Product, line["product_id"])
-        if not product:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid product {line['product_id']}"
-            )
+        product_id = line.get("product_id")
+        if product_id:
+            product = await db.get(Product, product_id)
+            if not product:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid product {product_id}"
+                )
         line_total = float(line["quantity"]) * float(line["unit_price"])
         tax_amount = line_total * float(line.get("tax_rate", 0))
         subtotal += line_total
         tax_total += tax_amount
         lines.append(
             InvoiceLine(
-                product_id=line["product_id"],
+                product_id=product_id,
+                description=line.get("description"),
                 quantity=line["quantity"],
                 unit_price=line["unit_price"],
                 tax_rate=line.get("tax_rate", 0),
@@ -104,7 +113,9 @@ async def create_invoice(
         customer_id=payload.customer_id,
         order_id=payload.order_id,
         currency=payload.currency,
+        invoice_date=payload.invoice_date or datetime.utcnow(),
         due_date=payload.due_date,
+        notes=payload.notes,
         subtotal=subtotal,
         tax_total=tax_total,
         total=subtotal + tax_total,

@@ -32,11 +32,11 @@ const invoiceSchema = z.object({
   order_id: z.string().optional(),
   invoice_date: z.string(),
   due_date: z.string().optional(),
-  status: z.string().default("draft"),
-  tax_amount: z.coerce.number().min(0, "Tax must be positive"),
+  status: z.enum(["draft", "posted", "paid", "written_off"]).default("draft"),
+  tax_total: z.coerce.number().min(0, "Tax must be positive"),
   currency: z.string().default("USD"),
   notes: z.string().optional(),
-  description: z.string().min(1, "Description is required"),
+  description: z.string().optional(),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
   unit_price: z.coerce.number().min(0, "Price must be positive"),
 });
@@ -71,7 +71,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
       invoice_date: new Date().toISOString().split('T')[0],
       due_date: "",
       status: "draft",
-      tax_amount: 0,
+      tax_total: 0,
       currency: "USD",
       notes: "",
       description: "",
@@ -107,7 +107,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
       invoice_date: data.invoice_date,
       due_date: data.due_date || undefined,
       status: data.status,
-      tax_amount: data.tax_amount,
+      tax_total: data.tax_total,
       currency: data.currency,
       notes: data.notes,
       lines: [
@@ -115,6 +115,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
           description: data.description,
           quantity: data.quantity,
           unit_price: data.unit_price,
+          tax_rate: 0,
         }
       ],
     };
@@ -210,9 +211,9 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
                     <FormControl>
                       <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
                         <option value="draft">Draft</option>
-                        <option value="sent">Sent</option>
+                        <option value="posted">Posted</option>
                         <option value="paid">Paid</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="written_off">Written off</option>
                       </select>
                     </FormControl>
                     <FormMessage />
