@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from app.models.order import OrderStatus
 from app.schemas.customer import CustomerOut
@@ -29,6 +29,25 @@ class OrderBase(BaseModel):
     currency: str = "USD"
     order_date: datetime | date | str | None = None
     status: OrderStatus = OrderStatus.draft
+
+    @validator("order_date", pre=True)
+    def _coerce_order_date(cls, v):
+        if v in (None, ""):
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, date):
+            return datetime.combine(v, datetime.min.time())
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                try:
+                    d = date.fromisoformat(v)
+                    return datetime.combine(d, datetime.min.time())
+                except ValueError:
+                    raise ValueError("Invalid date format")
+        return v
 
 
 class OrderCreate(OrderBase):
