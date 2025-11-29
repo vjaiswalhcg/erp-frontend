@@ -3,7 +3,12 @@ export interface OrderLine {
   product_id: string;
   quantity: number;
   unit_price: number;
-  total: number;
+  tax_rate: number;
+  line_total: number;
+  product?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface Order {
@@ -12,10 +17,12 @@ export interface Order {
   customer_id: string;
   order_date: string;
   status: string;
-  total_amount: number;
+  subtotal: number;
+  tax_total: number;
+  total: number;
   currency: string;
   notes: string | null;
-  lines?: OrderLine[];
+  lines: OrderLine[];
   customer?: {
     id: string;
     name: string;

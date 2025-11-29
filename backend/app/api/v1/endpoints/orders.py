@@ -19,7 +19,16 @@ async def list_orders(
     limit: int = Query(default=settings.default_page_size, le=settings.max_page_size),
     offset: int = Query(default=0, ge=0),
 ):
-    result = await db.execute(select(Order).offset(offset).limit(limit))
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.lines),
+            selectinload(Order.customer),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(query)
     return result.scalars().unique().all()
 
 
@@ -72,7 +81,15 @@ async def create_order(
 
 @router.get("/{order_id}", response_model=OrderOut)
 async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
-    result = await db.execute(select(Order).where(Order.id == order_id))
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.lines),
+            selectinload(Order.customer),
+        )
+        .where(Order.id == order_id)
+    )
+    result = await db.execute(query)
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -92,7 +109,15 @@ async def fulfill_order(order_id: str, db: AsyncSession = Depends(deps.get_sessi
 async def _transition_order(
     order_id: str, next_status: OrderStatus, db: AsyncSession
 ) -> Order:
-    result = await db.execute(select(Order).where(Order.id == order_id))
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.lines),
+            selectinload(Order.customer),
+        )
+        .where(Order.id == order_id)
+    )
+    result = await db.execute(query)
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -102,4 +127,3 @@ async def _transition_order(
     await db.commit()
     await db.refresh(order)
     return order
-

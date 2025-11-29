@@ -111,7 +111,7 @@ export function OrderTable() {
                   <TableCell>{new Date(order.order_date).toLocaleDateString()}</TableCell>
                   <TableCell>{order.customer?.name || order.customer_id}</TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
-                  <TableCell>{formatCurrency(order.total_amount, order.currency)}</TableCell>
+                  <TableCell>{formatCurrency(order.total, order.currency)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
