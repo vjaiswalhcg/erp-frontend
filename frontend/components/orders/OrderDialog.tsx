@@ -122,6 +122,8 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       // Try to surface validation details from FastAPI/Pydantic or raw body
       const detail = error?.response?.data?.detail;
       let message = "Failed to save order";
+      const url = error?.config?.url;
+      const method = error?.config?.method?.toUpperCase?.();
       if (Array.isArray(detail)) {
         const first = detail[0] || {};
         const loc = Array.isArray(first.loc) ? first.loc.join(" -> ") : undefined;
@@ -138,6 +140,11 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         }
       } else if (error?.message) {
         message = error.message;
+        if (url) {
+          message = `${message} (${method || "REQUEST"} ${url})`;
+        }
+      } else if (url) {
+        message = `Request failed (${method || "REQUEST"} ${url})`;
       }
       if (error?.response?.status) {
         message = `[${error.response.status}] ${message}`;
