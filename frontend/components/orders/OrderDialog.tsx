@@ -132,10 +132,12 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         message = detail;
       } else if (error?.response?.data) {
         try {
-          message = JSON.stringify(error.response.data);
+          message = JSON.stringify(error.response.data, null, 2);
         } catch {
           message = "Failed to save order (see console for details)";
         }
+      } else if (error?.message) {
+        message = error.message;
       }
       if (error?.response?.status) {
         message = `[${error.response.status}] ${message}`;
