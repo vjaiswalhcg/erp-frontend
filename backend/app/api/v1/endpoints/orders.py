@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -18,14 +18,21 @@ router = APIRouter(dependencies=[deps.get_auth()])
 def _normalize_order_date(value: datetime | str | None) -> datetime:
     if value is None:
         return datetime.utcnow()
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return datetime.combine(value, datetime.min.time())
     if isinstance(value, str):
         try:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid order_date format")
+            # try bare date
+            try:
+                parsed_date = date.fromisoformat(value)
+                return datetime.combine(parsed_date, datetime.min.time())
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid order_date format")
         # store naive UTC to match existing column
         return parsed.replace(tzinfo=None)
-    return value
+    return value.replace(tzinfo=None)
 
 
 @router.get("/", response_model=list[OrderOut])

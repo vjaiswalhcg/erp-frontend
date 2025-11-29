@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 const orderSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
   order_date: z.string(),
-  status: z.string().default("draft"),
+  status: z.enum(["draft", "confirmed", "fulfilled", "closed"]).default("draft"),
   currency: z.string().default("USD"),
   notes: z.string().optional(),
   product_id: z.string().min(1, "Product is required"),
@@ -196,7 +196,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
                         <option value="confirmed">Confirmed</option>
                         <option value="fulfilled">Fulfilled</option>
                         <option value="closed">Closed</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="closed">Closed</option>
                       </select>
                     </FormControl>
                     <FormMessage />

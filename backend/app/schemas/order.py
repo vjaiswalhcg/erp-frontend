@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, Field
 
 from app.models.order import OrderStatus
@@ -27,7 +27,7 @@ class OrderBase(BaseModel):
     external_ref: str | None = None
     customer_id: uuid.UUID
     currency: str = "USD"
-    order_date: datetime | None = None
+    order_date: datetime | date | str | None = None
     status: OrderStatus = OrderStatus.draft
 
 
