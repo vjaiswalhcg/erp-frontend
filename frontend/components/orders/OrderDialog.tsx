@@ -105,6 +105,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
           product_id: data.product_id,
           quantity: data.quantity,
           unit_price: data.unit_price,
+          tax_rate: 0,
         }
       ],
     };
