@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -49,6 +49,7 @@ interface OrderDialogProps {
 export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -99,24 +100,38 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       quantity: firstLine ? Number(firstLine.quantity) : 1,
       unit_price: firstLine ? Number(firstLine.unit_price) : 0,
     });
+    setApiError(null);
   }, [order, form]);
 
   const mutation = useMutation({
     mutationFn: (payload: OrderCreate | OrderUpdate) =>
-      order ? ordersApi.update(order.id, payload as OrderUpdate) : ordersApi.create(payload as OrderCreate),
+      order
+        ? ordersApi.update(order.id, payload as OrderUpdate)
+        : ordersApi.create(payload as OrderCreate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast({
         title: "Success",
         description: order ? "Order updated" : "Order created",
       });
+      setApiError(null);
       onOpenChange(false);
       form.reset();
     },
     onError: (error: any) => {
+      // Try to surface validation details from FastAPI/Pydantic
+      const detail = error?.response?.data?.detail;
+      let message = "Failed to save order";
+      if (Array.isArray(detail) && detail[0]?.msg) {
+        const loc = detail[0]?.loc?.join?.(" -> ") || "field";
+        message = `${detail[0].msg} (${loc})`;
+      } else if (typeof detail === "string") {
+        message = detail;
+      }
+      setApiError(message);
       toast({
         title: "Error",
-        description: error.response?.data?.detail || "Failed to save order",
+        description: message,
         variant: "destructive",
       });
     },
@@ -148,6 +163,11 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         <DialogHeader>
           <DialogTitle>{order ? "Edit Order" : "Create Order"}</DialogTitle>
         </DialogHeader>
+        {apiError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {apiError}
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
