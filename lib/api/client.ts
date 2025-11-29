@@ -1,24 +1,13 @@
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: "https://erp-backend-377784510062.us-central1.run.app/api/v1",
   headers: {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.NEXT_PUBLIC_API_KEY}`,
+    Authorization: "Bearer my-api-secret-key",
   },
 });
 
-// Request interceptor
-apiClient.interceptors.request.use(
-  (config) => {
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
