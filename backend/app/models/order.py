@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric
+from sqlalchemy import String, DateTime, Enum, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 import enum
@@ -31,6 +31,7 @@ class Order(Base):
     subtotal: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
     tax_total: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
     total: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     customer = relationship("Customer", back_populates="orders")
     lines = relationship(

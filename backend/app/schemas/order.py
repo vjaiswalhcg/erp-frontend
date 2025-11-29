@@ -29,6 +29,7 @@ class OrderBase(BaseModel):
     currency: str = "USD"
     order_date: datetime | date | str | None = None
     status: OrderStatus = OrderStatus.draft
+    notes: str | None = None
 
     @validator("order_date", pre=True)
     def _coerce_order_date(cls, v):
@@ -56,7 +57,6 @@ class OrderCreate(OrderBase):
 
 class OrderUpdate(OrderBase):
     lines: list[OrderLineCreate] | None = None
-    notes: str | None = None
 
 
 class OrderOut(OrderBase):

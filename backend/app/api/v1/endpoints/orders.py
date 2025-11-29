@@ -96,6 +96,7 @@ async def create_order(
         subtotal=subtotal,
         tax_total=tax_total,
         total=subtotal + tax_total,
+        notes=payload.notes,
         lines=lines,
     )
     db.add(order)
