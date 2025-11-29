@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api import deps
 from app.core.config import settings
@@ -65,7 +66,7 @@ async def create_order(
     )
     db.add(order)
     await db.commit()
-    await db.refresh(order)
+    await db.refresh(order, ["lines"])
     return order
 
 
