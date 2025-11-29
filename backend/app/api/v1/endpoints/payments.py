@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api import deps
 from app.core.config import settings
@@ -22,7 +23,13 @@ async def list_payments(
     limit: int = Query(default=settings.default_page_size, le=settings.max_page_size),
     offset: int = Query(default=0, ge=0),
 ):
-    result = await db.execute(select(Payment).offset(offset).limit(limit))
+    query = (
+        select(Payment)
+        .options(selectinload(Payment.customer))
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(query)
     return result.scalars().unique().all()
 
 
@@ -42,7 +49,7 @@ async def create_payment(
     payment = Payment(**payload.dict())
     db.add(payment)
     await db.commit()
-    await db.refresh(payment)
+    await db.refresh(payment, ["customer"])
     return payment
 
 
@@ -52,7 +59,12 @@ async def apply_payment(
     application: PaymentApplicationCreate,
     db: AsyncSession = Depends(deps.get_session),
 ):
-    result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    query = (
+        select(Payment)
+        .options(selectinload(Payment.customer))
+        .where(Payment.id == payment_id)
+    )
+    result = await db.execute(query)
     payment = result.scalar_one_or_none()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -81,6 +93,6 @@ async def apply_payment(
     if remaining - application.amount_applied <= 0:
         payment.status = PaymentStatus.applied
     await db.commit()
-    await db.refresh(payment)
+    await db.refresh(payment, ["customer"])
     return payment
 

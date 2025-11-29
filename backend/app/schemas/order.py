@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.order import OrderStatus
+from app.schemas.customer import CustomerOut
+from app.schemas.product import ProductOut
 
 
 class OrderLineCreate(BaseModel):
@@ -15,6 +17,7 @@ class OrderLineCreate(BaseModel):
 class OrderLineOut(OrderLineCreate):
     id: uuid.UUID
     line_total: float
+    product: ProductOut | None = None
 
     class Config:
         orm_mode = True
@@ -32,6 +35,11 @@ class OrderCreate(OrderBase):
     lines: list[OrderLineCreate]
 
 
+class OrderUpdate(OrderBase):
+    lines: list[OrderLineCreate] | None = None
+    notes: str | None = None
+
+
 class OrderOut(OrderBase):
     id: uuid.UUID
     order_date: datetime
@@ -40,6 +48,7 @@ class OrderOut(OrderBase):
     tax_total: float
     total: float
     lines: list[OrderLineOut] = []
+    customer: CustomerOut | None = None
 
     class Config:
         orm_mode = True
@@ -47,4 +56,3 @@ class OrderOut(OrderBase):
 
 class OrderUpdateStatus(BaseModel):
     status: OrderStatus
-

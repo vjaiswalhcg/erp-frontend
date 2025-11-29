@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api import deps
 from app.core.config import settings
@@ -19,7 +20,17 @@ async def list_invoices(
     limit: int = Query(default=settings.default_page_size, le=settings.max_page_size),
     offset: int = Query(default=0, ge=0),
 ):
-    result = await db.execute(select(Invoice).offset(offset).limit(limit))
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines),
+            selectinload(Invoice.customer),
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+    result = await db.execute(query)
     return result.scalars().unique().all()
 
 
@@ -101,13 +112,22 @@ async def create_invoice(
     )
     db.add(invoice)
     await db.commit()
-    await db.refresh(invoice)
+    await db.refresh(invoice, ["lines", "customer"])
     return invoice
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
 async def get_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_session)):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines),
+            selectinload(Invoice.customer),
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+        )
+        .where(Invoice.id == invoice_id)
+    )
+    result = await db.execute(query)
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -129,12 +149,21 @@ async def write_off_invoice(
 async def _transition_invoice(
     invoice_id: str, next_status: InvoiceStatus, db: AsyncSession
 ) -> Invoice:
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines),
+            selectinload(Invoice.customer),
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+        )
+        .where(Invoice.id == invoice_id)
+    )
+    result = await db.execute(query)
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     invoice.status = next_status
     await db.commit()
-    await db.refresh(invoice)
+    await db.refresh(invoice, ["lines", "customer"])
     return invoice
 

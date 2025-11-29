@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -7,7 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { ordersApi } from "@/lib/api/orders";
 import { customersApi } from "@/lib/api/customers";
 import { productsApi } from "@/lib/api/products";
-import { Order, OrderCreate } from "@/lib/types/order";
+import { Order, OrderCreate, OrderUpdate } from "@/lib/types/order";
 import {
   Dialog,
   DialogContent,
@@ -63,7 +64,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
     resolver: zodResolver(orderSchema),
     defaultValues: {
       customer_id: "",
-      order_date: new Date().toISOString().split('T')[0],
+      order_date: new Date().toISOString().split("T")[0],
       status: "draft",
       currency: "USD",
       notes: "",
@@ -73,13 +74,41 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: ordersApi.create,
+  useEffect(() => {
+    if (!order) {
+      form.reset({
+        customer_id: "",
+        order_date: new Date().toISOString().split("T")[0],
+        status: "draft",
+        currency: "USD",
+        notes: "",
+        product_id: "",
+        quantity: 1,
+        unit_price: 0,
+      });
+      return;
+    }
+    const firstLine = order.lines?.[0];
+    form.reset({
+      customer_id: order.customer_id,
+      order_date: order.order_date.split("T")[0],
+      status: order.status,
+      currency: order.currency,
+      notes: order.notes || "",
+      product_id: firstLine?.product_id || "",
+      quantity: firstLine ? Number(firstLine.quantity) : 1,
+      unit_price: firstLine ? Number(firstLine.unit_price) : 0,
+    });
+  }, [order, form]);
+
+  const mutation = useMutation({
+    mutationFn: (payload: OrderCreate | OrderUpdate) =>
+      order ? ordersApi.update(order.id, payload as OrderUpdate) : ordersApi.create(payload as OrderCreate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast({
         title: "Success",
-        description: "Order created successfully",
+        description: order ? "Order updated" : "Order created",
       });
       onOpenChange(false);
       form.reset();
@@ -87,17 +116,17 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.response?.data?.detail || "Failed to create order",
+        description: error.response?.data?.detail || "Failed to save order",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: OrderFormValues) => {
-    const payload: OrderCreate = {
+    const payload: OrderCreate | OrderUpdate = {
       customer_id: data.customer_id,
       order_date: data.order_date,
-      status: data.status,
+      status: data.status as Order["status"],
       currency: data.currency,
       notes: data.notes,
       lines: [
@@ -106,18 +135,18 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
           quantity: data.quantity,
           unit_price: data.unit_price,
           tax_rate: 0,
-        }
+        },
       ],
     };
 
-    createMutation.mutate(payload);
+    mutation.mutate(payload);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create Order</DialogTitle>
+          <DialogTitle>{order ? "Edit Order" : "Create Order"}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -165,6 +194,8 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
                       <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
                         <option value="draft">Draft</option>
                         <option value="confirmed">Confirmed</option>
+                        <option value="fulfilled">Fulfilled</option>
+                        <option value="closed">Closed</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </FormControl>
@@ -248,8 +279,8 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                Create Order
+              <Button type="submit" disabled={mutation.isPending}>
+                {order ? "Save Changes" : "Create Order"}
               </Button>
             </div>
           </form>

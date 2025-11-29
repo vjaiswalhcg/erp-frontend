@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.models.customer import Customer
 from app.models.order import Order, OrderLine, OrderStatus
 from app.models.product import Product
-from app.schemas.order import OrderCreate, OrderOut, OrderUpdateStatus
+from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderUpdateStatus
 
 router = APIRouter(dependencies=[deps.get_auth()])
 
@@ -27,6 +27,7 @@ async def list_orders(
         .options(
             selectinload(Order.lines),
             selectinload(Order.customer),
+            selectinload(Order.lines).selectinload(OrderLine.product),
         )
         .offset(offset)
         .limit(limit)
@@ -80,7 +81,7 @@ async def create_order(
     )
     db.add(order)
     await db.commit()
-    await db.refresh(order, ["lines"])
+    await db.refresh(order, ["lines", "customer"])
     return order
 
 
@@ -94,6 +95,58 @@ async def delete_order(order_id: str, db: AsyncSession = Depends(deps.get_sessio
     return Response(status_code=204)
 
 
+@router.put("/{order_id}", response_model=OrderOut)
+async def update_order(
+    order_id: str, payload: OrderUpdate, db: AsyncSession = Depends(deps.get_session)
+):
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    customer = await db.get(Customer, payload.customer_id)
+    if not customer:
+        raise HTTPException(status_code=400, detail="Invalid customer")
+
+    if payload.lines is not None:
+        new_lines: list[OrderLine] = []
+        subtotal = 0
+        tax_total = 0
+        for line in payload.lines:
+            product = await db.get(Product, line.product_id)
+            if not product:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid product {line.product_id}"
+                )
+            line_total = float(line.quantity) * float(line.unit_price)
+            tax_amount = line_total * float(line.tax_rate)
+            subtotal += line_total
+            tax_total += tax_amount
+            new_lines.append(
+                OrderLine(
+                    product_id=line.product_id,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    tax_rate=line.tax_rate,
+                    line_total=line_total + tax_amount,
+                )
+            )
+        order.lines = new_lines
+        order.subtotal = subtotal
+        order.tax_total = tax_total
+        order.total = subtotal + tax_total
+
+    order.external_ref = payload.external_ref
+    order.customer_id = payload.customer_id
+    order.order_date = payload.order_date or order.order_date
+    order.status = payload.status
+    order.currency = payload.currency
+    order.notes = payload.notes
+
+    await db.commit()
+    await db.refresh(order, ["lines", "customer"])
+    return order
+
+
 @router.get("/{order_id}", response_model=OrderOut)
 async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
     query = (
@@ -101,6 +154,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session))
         .options(
             selectinload(Order.lines),
             selectinload(Order.customer),
+            selectinload(Order.lines).selectinload(OrderLine.product),
         )
         .where(Order.id == order_id)
     )
@@ -129,6 +183,7 @@ async def _transition_order(
         .options(
             selectinload(Order.lines),
             selectinload(Order.customer),
+            selectinload(Order.lines).selectinload(OrderLine.product),
         )
         .where(Order.id == order_id)
     )
@@ -140,5 +195,5 @@ async def _transition_order(
         raise HTTPException(status_code=400, detail="Order already closed")
     order.status = next_status
     await db.commit()
-    await db.refresh(order)
+    await db.refresh(order, ["lines", "customer"])
     return order

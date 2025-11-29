@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.invoice import InvoiceStatus
+from app.schemas.customer import CustomerOut
+from app.schemas.product import ProductOut
 
 
 class InvoiceLineCreate(BaseModel):
@@ -15,6 +17,7 @@ class InvoiceLineCreate(BaseModel):
 class InvoiceLineOut(InvoiceLineCreate):
     id: uuid.UUID
     line_total: float
+    product: ProductOut | None = None
 
     class Config:
         orm_mode = True
@@ -40,6 +43,7 @@ class InvoiceOut(InvoiceBase):
     tax_total: float
     total: float
     lines: list[InvoiceLineOut] = []
+    customer: CustomerOut | None = None
 
     class Config:
         orm_mode = True

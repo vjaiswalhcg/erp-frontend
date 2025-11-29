@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.models.payment import PaymentStatus
+from app.schemas.customer import CustomerOut
 
 
 class PaymentBase(BaseModel):
@@ -23,6 +24,7 @@ class PaymentOut(PaymentBase):
     id: uuid.UUID
     status: PaymentStatus
     received_date: datetime
+    customer: CustomerOut | None = None
 
     class Config:
         orm_mode = True

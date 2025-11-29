@@ -46,6 +46,15 @@ export interface OrderCreate {
 
 export interface OrderUpdate {
   external_ref?: string;
-  status?: string;
+  customer_id: string;
+  order_date?: string;
+  status: "draft" | "confirmed" | "fulfilled" | "closed";
+  currency: string;
   notes?: string;
+  lines?: {
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    tax_rate?: number;
+  }[];
 }
