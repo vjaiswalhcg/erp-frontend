@@ -119,14 +119,26 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       form.reset();
     },
     onError: (error: any) => {
-      // Try to surface validation details from FastAPI/Pydantic
+      // Try to surface validation details from FastAPI/Pydantic or raw body
       const detail = error?.response?.data?.detail;
       let message = "Failed to save order";
-      if (Array.isArray(detail) && detail[0]?.msg) {
-        const loc = detail[0]?.loc?.join?.(" -> ") || "field";
-        message = `${detail[0].msg} (${loc})`;
-      } else if (typeof detail === "string") {
+      if (Array.isArray(detail)) {
+        const first = detail[0] || {};
+        const loc = Array.isArray(first.loc) ? first.loc.join(" -> ") : undefined;
+        if (first.msg) {
+          message = loc ? `${first.msg} (${loc})` : first.msg;
+        }
+      } else if (typeof detail === "string" && detail.trim().length > 0) {
         message = detail;
+      } else if (error?.response?.data) {
+        try {
+          message = JSON.stringify(error.response.data);
+        } catch {
+          message = "Failed to save order (see console for details)";
+        }
+      }
+      if (error?.response?.status) {
+        message = `[${error.response.status}] ${message}`;
       }
       setApiError(message);
       toast({
