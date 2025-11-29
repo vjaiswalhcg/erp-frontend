@@ -1,7 +1,10 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.responses import Response
 
 from app.api import deps
 from app.core.config import settings
@@ -67,6 +70,8 @@ async def create_order(
     order = Order(
         external_ref=payload.external_ref,
         customer_id=payload.customer_id,
+        order_date=payload.order_date or datetime.utcnow(),
+        status=payload.status,
         currency=payload.currency,
         subtotal=subtotal,
         tax_total=tax_total,
@@ -77,6 +82,16 @@ async def create_order(
     await db.commit()
     await db.refresh(order, ["lines"])
     return order
+
+
+@router.delete("/{order_id}", status_code=204)
+async def delete_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    await db.delete(order)
+    await db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/{order_id}", response_model=OrderOut)

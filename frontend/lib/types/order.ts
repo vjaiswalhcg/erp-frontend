@@ -16,7 +16,7 @@ export interface Order {
   external_ref: string | null;
   customer_id: string;
   order_date: string;
-  status: string;
+  status: "draft" | "confirmed" | "fulfilled" | "closed";
   subtotal: number;
   tax_total: number;
   total: number;

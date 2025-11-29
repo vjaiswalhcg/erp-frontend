@@ -24,6 +24,8 @@ class OrderBase(BaseModel):
     external_ref: str | None = None
     customer_id: uuid.UUID
     currency: str = "USD"
+    order_date: datetime | None = None
+    status: OrderStatus = OrderStatus.draft
 
 
 class OrderCreate(OrderBase):
