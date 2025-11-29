@@ -33,6 +33,7 @@ export interface OrderCreate {
     product_id: string;
     quantity: number;
     unit_price: number;
+    tax_rate?: number;
   }[];
 }
 
