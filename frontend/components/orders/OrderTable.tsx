@@ -30,12 +30,14 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 export function OrderTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-   const [search, setSearch] = useState("");
-   const [statusFilter, setStatusFilter] = useState<string>("all");
-   const [sortField, setSortField] = useState<"order_date" | "total" | "status">("order_date");
-   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-   const [page, setPage] = useState(1);
-   const pageSize = 10;
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<"order_date" | "total" | "status">(
+    "order_date"
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -78,17 +80,15 @@ export function OrderTable() {
     }
   };
 
-  if (isLoading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
-  }
-
   const processedOrders = useMemo(() => {
     const filtered = (orders || []).filter((o) => {
+      const searchTerm = search.toLowerCase();
       const matchesSearch =
-        o.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        o.customer_id.toLowerCase().includes(search.toLowerCase()) ||
-        o.external_ref?.toLowerCase().includes(search.toLowerCase() || "");
-      const matchesStatus = statusFilter === "all" ? true : o.status === statusFilter;
+        o.customer?.name?.toLowerCase().includes(searchTerm) ||
+        o.customer_id.toLowerCase().includes(searchTerm) ||
+        o.external_ref?.toLowerCase().includes(searchTerm);
+      const matchesStatus =
+        statusFilter === "all" ? true : o.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
 
@@ -99,7 +99,9 @@ export function OrderTable() {
         return sortDir === "asc" ? aDate - bDate : bDate - aDate;
       }
       if (sortField === "total") {
-        return sortDir === "asc" ? Number(a.total) - Number(b.total) : Number(b.total) - Number(a.total);
+        return sortDir === "asc"
+          ? Number(a.total) - Number(b.total)
+          : Number(b.total) - Number(a.total);
       }
       return sortDir === "asc"
         ? a.status.localeCompare(b.status)
@@ -118,6 +120,10 @@ export function OrderTable() {
     };
   }, [orders, search, statusFilter, sortDir, sortField, page]);
 
+  if (isLoading) {
+    return <div className="flex justify-center p-8">Loading...</div>;
+  }
+
   const toggleSort = (field: typeof sortField) => {
     if (sortField === field) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -128,7 +134,10 @@ export function OrderTable() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    const variants: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
       draft: "secondary",
       confirmed: "default",
       fulfilled: "outline",
@@ -142,7 +151,9 @@ export function OrderTable() {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Orders</h2>
-          <p className="text-sm text-muted-foreground">Track, filter, and manage recent orders.</p>
+          <p className="text-sm text-muted-foreground">
+            Track, filter, and manage recent orders.
+          </p>
         </div>
         <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
@@ -180,7 +191,10 @@ export function OrderTable() {
         <Select
           value={`${sortField}:${sortDir}`}
           onValueChange={(value) => {
-            const [field, dir] = value.split(":") as [typeof sortField, typeof sortDir];
+            const [field, dir] = value.split(":") as [
+              typeof sortField,
+              typeof sortDir
+            ];
             setSortField(field);
             setSortDir(dir);
           }}
@@ -191,10 +205,10 @@ export function OrderTable() {
           <SelectContent>
             <SelectItem value="order_date:desc">Newest first</SelectItem>
             <SelectItem value="order_date:asc">Oldest first</SelectItem>
-            <SelectItem value="total:desc">Total high → low</SelectItem>
-            <SelectItem value="total:asc">Total low → high</SelectItem>
-            <SelectItem value="status:asc">Status A → Z</SelectItem>
-            <SelectItem value="status:desc">Status Z → A</SelectItem>
+            <SelectItem value="total:desc">Total high -&gt; low</SelectItem>
+            <SelectItem value="total:asc">Total low -&gt; high</SelectItem>
+            <SelectItem value="status:asc">Status A -&gt; Z</SelectItem>
+            <SelectItem value="status:desc">Status Z -&gt; A</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -203,15 +217,39 @@ export function OrderTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("order_date")}>
-                Order Date {sortField === "order_date" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => toggleSort("order_date")}
+              >
+                Order Date{" "}
+                {sortField === "order_date"
+                  ? sortDir === "asc"
+                    ? "(asc)"
+                    : "(desc)"
+                  : ""}
               </TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("status")}>
-                Status {sortField === "status" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => toggleSort("status")}
+              >
+                Status{" "}
+                {sortField === "status"
+                  ? sortDir === "asc"
+                    ? "(asc)"
+                    : "(desc)"
+                  : ""}
               </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => toggleSort("total")}>
-                Total {sortField === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => toggleSort("total")}
+              >
+                Total{" "}
+                {sortField === "total"
+                  ? sortDir === "asc"
+                    ? "(asc)"
+                    : "(desc)"
+                  : ""}
               </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -219,7 +257,10 @@ export function OrderTable() {
           <TableBody>
             {processedOrders.rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="text-center text-muted-foreground"
+                >
                   No orders match your filters.
                 </TableCell>
               </TableRow>
@@ -229,10 +270,14 @@ export function OrderTable() {
                   <TableCell>{formatDate(order.order_date)}</TableCell>
                   <TableCell className="font-medium">
                     {order.customer?.name || "Unnamed customer"}
-                    <div className="text-xs text-muted-foreground">{order.external_ref || order.customer_id}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {order.external_ref || order.customer_id}
+                    </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
-                  <TableCell>{formatCurrency(Number(order.total), order.currency)}</TableCell>
+                  <TableCell>
+                    {formatCurrency(Number(order.total), order.currency)}
+                  </TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button
                       variant="ghost"
@@ -260,7 +305,11 @@ export function OrderTable() {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>
           Showing {(processedOrders.currentPage - 1) * pageSize + 1}-
-          {Math.min(processedOrders.currentPage * pageSize, processedOrders.total)} of {processedOrders.total}
+          {Math.min(
+            processedOrders.currentPage * pageSize,
+            processedOrders.total
+          )}{" "}
+          of {processedOrders.total}
         </div>
         <div className="space-x-2">
           <Button
@@ -275,7 +324,9 @@ export function OrderTable() {
             variant="outline"
             size="sm"
             disabled={processedOrders.currentPage >= processedOrders.totalPages}
-            onClick={() => setPage((p) => Math.min(processedOrders.totalPages, p + 1))}
+            onClick={() =>
+              setPage((p) => Math.min(processedOrders.totalPages, p + 1))
+            }
           >
             Next
           </Button>
