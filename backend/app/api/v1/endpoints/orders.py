@@ -15,6 +15,18 @@ from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderUpdateSta
 
 router = APIRouter(dependencies=[deps.get_auth()])
 
+def _normalize_order_date(value: datetime | str | None) -> datetime:
+    if value is None:
+        return datetime.utcnow()
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid order_date format")
+        # store naive UTC to match existing column
+        return parsed.replace(tzinfo=None)
+    return value
+
 
 @router.get("/", response_model=list[OrderOut])
 async def list_orders(
@@ -71,7 +83,7 @@ async def create_order(
     order = Order(
         external_ref=payload.external_ref,
         customer_id=payload.customer_id,
-        order_date=payload.order_date or datetime.utcnow(),
+        order_date=_normalize_order_date(payload.order_date),
         status=payload.status,
         currency=payload.currency,
         subtotal=subtotal,
@@ -137,7 +149,7 @@ async def update_order(
 
     order.external_ref = payload.external_ref
     order.customer_id = payload.customer_id
-    order.order_date = payload.order_date or order.order_date
+    order.order_date = _normalize_order_date(payload.order_date) or order.order_date
     order.status = payload.status
     order.currency = payload.currency
     order.notes = payload.notes
