@@ -116,7 +116,7 @@ export function InvoiceTable() {
                     {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "-"}
                   </TableCell>
                   <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                  <TableCell>{formatCurrency(invoice.total_amount, invoice.currency)}</TableCell>
+                  <TableCell>{formatCurrency(invoice.total, invoice.currency)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"

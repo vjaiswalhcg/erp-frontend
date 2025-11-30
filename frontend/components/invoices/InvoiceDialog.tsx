@@ -257,7 +257,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
 
               <FormField
                 control={form.control}
-                name="tax_amount"
+              name="tax_total"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tax Amount</FormLabel>
