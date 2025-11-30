@@ -31,6 +31,7 @@ class InvoiceBase(BaseModel):
     order_id: uuid.UUID | None = None
     customer_id: uuid.UUID
     currency: str = "USD"
+    status: InvoiceStatus = InvoiceStatus.draft
     due_date: datetime | None = None
     invoice_date: datetime | date | str | None = None
     notes: str | None = None
