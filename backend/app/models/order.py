@@ -41,6 +41,7 @@ class Order(Base):
 
 
 class OrderLine(Base):
+    __tablename__ = "order_line"
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
