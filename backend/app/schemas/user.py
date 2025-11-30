@@ -17,6 +17,13 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.viewer
 
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=6)
+    role: UserRole | None = None
+    is_active: bool | None = None
+
+
 class UserOut(UserBase):
     id: uuid.UUID
     created_at: datetime
