@@ -5,6 +5,9 @@ export interface UserCreatePayload {
   email: string;
   password: string;
   role: User["role"];
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
 }
 
 export interface UserUpdatePayload {
