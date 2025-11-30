@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
 function initialsFromUser(user?: { first_name?: string | null; last_name?: string | null; email?: string | null }) {
   const first = user?.first_name?.trim() || "";
   const last = user?.last_name?.trim() || "";
-  const initialFromEmail = user?.email?.[0]?.toUpperCase() || "U";
+  const emailFirst = user?.email?.split("@")[0] || "";
+  const initialFromEmail = emailFirst.slice(0, 2).toUpperCase() || "U";
   if (first || last) {
     const combo = `${first.charAt(0)}${last.charAt(0) || ""}`.toUpperCase().trim();
     return combo || initialFromEmail;
