@@ -18,7 +18,8 @@ function initialsFromUser(user?: { first_name?: string | null; last_name?: strin
   const last = user?.last_name?.trim() || "";
   const initialFromEmail = user?.email?.[0]?.toUpperCase() || "U";
   if (first || last) {
-    return `${first.charAt(0)}${last.charAt(0) || ""}`.toUpperCase() || initialFromEmail;
+    const combo = `${first.charAt(0)}${last.charAt(0) || ""}`.toUpperCase().trim();
+    return combo || initialFromEmail;
   }
   return initialFromEmail;
 }

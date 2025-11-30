@@ -148,7 +148,10 @@ export default function AdminUsersPage() {
   const filteredUsers = useMemo(() => {
     const term = search.toLowerCase();
     return (users || []).filter(
-      (u) => u.email.toLowerCase().includes(term) || u.role.toLowerCase().includes(term)
+      (u) =>
+        u.email.toLowerCase().includes(term) ||
+        u.role.toLowerCase().includes(term) ||
+        `${u.first_name || ""} ${u.last_name || ""}`.toLowerCase().includes(term)
     );
   }, [users, search]);
 
@@ -173,7 +176,7 @@ export default function AdminUsersPage() {
       <div className="flex flex-col gap-3 rounded-lg border bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Input
-            placeholder="Search by email or role"
+            placeholder="Search by name, email, or role"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full sm:max-w-xs"
