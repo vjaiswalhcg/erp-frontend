@@ -1,7 +1,8 @@
 import axios from "axios";
 import { clearAuth, getAccessToken, getRefreshToken, setAuthFromTokens } from "@/lib/auth";
 
-const BASE_URL = "https://erp-backend-fb7fdd6n4a-uc.a.run.app/api/v1";
+// Use environment variable for API URL - set NEXT_PUBLIC_API_URL in your .env.local
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
