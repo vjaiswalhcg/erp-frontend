@@ -220,7 +220,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
                       <option value="">No invoice</option>
                       {invoices?.map((inv) => (
                         <option key={inv.id} value={inv.id}>
-                          {inv.customer?.name} - {new Date(inv.invoice_date).toLocaleDateString()} - ${inv.total_amount}
+                          {inv.customer?.name} - {new Date(inv.invoice_date).toLocaleDateString()} - ${inv.total}
                         </option>
                       ))}
                     </select>
