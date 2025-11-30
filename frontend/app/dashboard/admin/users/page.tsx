@@ -187,6 +187,7 @@ export default function AdminUsersPage() {
           <table className="min-w-full">
             <thead>
               <tr className="text-left text-sm text-muted-foreground">
+                <th className="px-3 py-2">Name</th>
                 <th className="px-3 py-2">Email</th>
                 <th className="px-3 py-2">Role</th>
                 <th className="px-3 py-2">Status</th>
@@ -207,24 +208,28 @@ export default function AdminUsersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((u) => (
-                  <tr key={u.id} className="border-t text-sm">
-                    <td className="px-3 py-2">{u.email}</td>
-                    <td className="px-3 py-2">
-                      <Badge variant="secondary">{u.role}</Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge variant={u.is_active ? "default" : "destructive"}>
-                        {u.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(u)}>
-                        Edit
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                filteredUsers.map((u) => {
+                  const name = `${u.first_name || ""} ${u.last_name || ""}`.trim();
+                  return (
+                    <tr key={u.id} className="border-t text-sm">
+                      <td className="px-3 py-2">{name || "-"}</td>
+                      <td className="px-3 py-2">{u.email}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="secondary">{u.role}</Badge>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge variant={u.is_active ? "default" : "destructive"}>
+                          {u.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(u)}>
+                          Edit
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

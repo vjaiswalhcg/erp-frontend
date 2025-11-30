@@ -46,10 +46,6 @@ export function UserMenu() {
         >
           {initials}
         </div>
-        <div className="hidden text-left text-sm leading-tight sm:block">
-          <div className="font-semibold text-slate-900">{name}</div>
-          <div className="text-xs text-slate-500">{user?.role || "..."}</div>
-        </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>
