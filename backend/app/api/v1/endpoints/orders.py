@@ -13,7 +13,7 @@ from app.models.order import Order, OrderLine, OrderStatus
 from app.models.product import Product
 from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderUpdateStatus
 
-router = APIRouter(dependencies=[deps.get_auth()])
+router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
 def _normalize_order_date(value: datetime | str | None) -> datetime:
     if value is None:

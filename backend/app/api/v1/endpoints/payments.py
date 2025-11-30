@@ -15,7 +15,7 @@ from app.schemas.payment import (
     PaymentUpdate,
 )
 
-router = APIRouter(dependencies=[deps.get_auth()])
+router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
 
 @router.get("/", response_model=list[PaymentOut])

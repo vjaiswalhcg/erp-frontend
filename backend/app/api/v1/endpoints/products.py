@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
 
-router = APIRouter(dependencies=[deps.get_auth()])
+router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
 
 @router.get("/", response_model=list[ProductOut])

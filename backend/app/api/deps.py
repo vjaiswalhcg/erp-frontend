@@ -2,7 +2,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.security import get_auth_dependency
+from app.core.security import get_current_user
 
 
 async def get_session() -> AsyncSession:
@@ -11,5 +11,5 @@ async def get_session() -> AsyncSession:
 
 
 def get_auth():
-    return get_auth_dependency()
+    return get_current_user
 

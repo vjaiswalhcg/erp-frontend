@@ -63,5 +63,5 @@ async def refresh(payload: TokenRefresh, db: AsyncSession = Depends(deps.get_ses
 
 
 @router.get("/me", response_model=UserOut)
-async def read_me(current_user: User = Depends(deps.get_auth())):
+async def read_me(current_user: User = Depends(deps.get_auth)):
     return current_user

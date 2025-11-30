@@ -13,7 +13,7 @@ from app.models.product import Product
 from app.models.payment import PaymentApplication
 from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 
-router = APIRouter(dependencies=[deps.get_auth()])
+router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
 
 @router.get("/", response_model=list[InvoiceOut])
