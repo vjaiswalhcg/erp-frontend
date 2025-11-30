@@ -20,10 +20,19 @@ A modern, full-stack ERP system built for Salesforce integration pilots.
 | **User Management** | ✅ | Admin CRUD, roles (admin/manager/staff/viewer) |
 | **Customers** | ✅ | Full CRUD operations |
 | **Products** | ✅ | Full CRUD operations |
-| **Orders** | ✅ | Single line item per order |
-| **Invoices** | ✅ | Single line item, optional order linking |
+| **Orders** | ✅ | **Multiple line items**, status workflow |
+| **Invoices** | ✅ | **Multiple line items**, optional order linking |
 | **Payments** | ✅ | Optional invoice application |
-| **Dashboard** | ✅ | Counts and revenue totals |
+| **Dashboard** | ✅ | Analytics, metrics, recent activity |
+| **Role-Based UI** | ✅ | Hide/show buttons based on user role |
+
+## 🌐 Production URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | https://erp-frontend-377784510062.us-central1.run.app |
+| Backend API | https://erp-backend-fb7fdd6n4a-uc.a.run.app/api/v1 |
+| API Docs | https://erp-backend-fb7fdd6n4a-uc.a.run.app/docs |
 
 ## 🚀 Quick Start
 
@@ -44,7 +53,7 @@ cd erp-frontend
 
 **2. Backend Setup:**
 ```bash
-cd frontend/backend
+cd backend
 
 # Create virtual environment
 python -m venv venv
@@ -66,7 +75,7 @@ uvicorn app.main:app --reload --port 8000
 
 **3. Frontend Setup:**
 ```bash
-cd frontend/frontend
+cd frontend
 
 # Install dependencies
 npm install
@@ -84,81 +93,67 @@ npm run dev
 ## 📁 Project Structure
 
 ```
-EDW/
-├── frontend/
-│   ├── backend/              # FastAPI backend (JWT auth + User management)
-│   │   ├── app/
-│   │   │   ├── api/v1/       # API endpoints
-│   │   │   ├── core/         # Config, auth, security
-│   │   │   ├── models/       # SQLAlchemy models
-│   │   │   └── schemas/      # Pydantic schemas
-│   │   ├── alembic/          # Database migrations
-│   │   ├── Dockerfile
-│   │   └── requirements.txt
-│   │
-│   └── frontend/             # Next.js 14 frontend
-│       ├── app/              # App router pages
-│       ├── components/       # React components
-│       ├── lib/              # API clients & utilities
-│       └── hooks/            # Custom React hooks
+erp-frontend/
+├── backend/                  # FastAPI backend (JWT auth + User management)
+│   ├── app/
+│   │   ├── api/v1/           # API endpoints
+│   │   ├── core/             # Config, auth, security
+│   │   ├── models/           # SQLAlchemy models
+│   │   └── schemas/          # Pydantic schemas
+│   ├── alembic/              # Database migrations
+│   ├── Dockerfile
+│   └── requirements.txt
 │
-├── backend/                  # ⚠️ OLD - Simple auth (deprecated)
+├── frontend/                 # Next.js 14 frontend
+│   ├── app/                  # App router pages
+│   ├── components/           # React components
+│   ├── lib/                  # API clients & utilities
+│   └── hooks/                # Custom React hooks (useAuth, usePermissions)
+│
 ├── CLAUDE.md                 # AI assistant guide
+├── PRODUCTION_PLAN.md        # Deployment roadmap
 ├── IMPLEMENTATION_SUMMARY.md # Feature details
 └── README.md                 # This file
 ```
 
-> **Note:** The `backend/` folder at root level contains an older version with simple bearer token auth. The current deployed version is in `frontend/backend/` with full JWT authentication.
+## 🚀 Deployment
 
-## 🌐 Deployment
-
-### Deployed URLs
-
-- **Frontend:** https://erp-frontend-377784510062.us-central1.run.app
-- **Backend:** https://erp-backend-377784510062.us-central1.run.app/docs
-
-### Deploy to Google Cloud Run
-
-**Backend:**
+### Deploy Backend
 ```bash
-cd frontend/backend
+cd ~/erp-monorepo/backend
+git pull origin main
 
-gcloud run deploy erp-backend \
-  --source . \
-  --region=us-central1 \
-  --platform=managed \
-  --allow-unauthenticated \
-  --add-cloudsql-instances=PROJECT:REGION:INSTANCE \
-  --set-env-vars="DATABASE_URL=...,SECRET_KEY=...,CORS_ORIGINS=https://your-frontend.run.app"
+gcloud run deploy erp-backend --source . --region us-central1 \
+  --update-env-vars="CORS_ORIGINS=https://erp-frontend-377784510062.us-central1.run.app"
 ```
 
-**Frontend:**
+### Deploy Frontend
 ```bash
-cd frontend/frontend
+cd ~/erp-monorepo/frontend
+git pull origin main
 
-gcloud run deploy erp-frontend \
-  --source . \
-  --region=us-central1 \
-  --platform=managed \
-  --allow-unauthenticated \
-  --set-env-vars="NEXT_PUBLIC_API_URL=https://your-backend.run.app/api/v1"
+gcloud run deploy erp-frontend --source . --region us-central1 \
+  --platform managed --allow-unauthenticated
 ```
+
+> **Important:** The frontend API URL is configured in `next.config.js` (not Cloud Run env vars) because Next.js bakes `NEXT_PUBLIC_*` variables at build time.
 
 ## 🔐 Environment Variables
 
-### Backend (`frontend/backend/.env`)
+### Backend (`backend/.env`)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+psycopg_async://user:pass@host/db` |
 | `SECRET_KEY` | JWT signing key | Random 32+ character string |
-| `CORS_ORIGINS` | Allowed frontend URLs | `http://localhost:3000,https://frontend.run.app` |
+| `CORS_ORIGINS` | Allowed frontend URLs | `https://frontend.run.app` |
 
-### Frontend (`frontend/frontend/.env.local`)
+### Frontend (`frontend/next.config.js`)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:8000/api/v1` |
+The production API URL is configured in `next.config.js`:
+```javascript
+NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://erp-backend-fb7fdd6n4a-uc.a.run.app/api/v1'
+```
 
 ## 🛠️ Tech Stack
 
@@ -181,10 +176,11 @@ gcloud run deploy erp-frontend \
 ## 📋 API Endpoints
 
 ### Authentication
-- `POST /api/v1/auth/register` - Register new user
 - `POST /api/v1/auth/login` - Login and get tokens
 - `POST /api/v1/auth/refresh` - Refresh access token
 - `GET /api/v1/auth/me` - Get current user
+
+> Note: Public registration is disabled for security. Users are created by admins via `/api/v1/users/`.
 
 ### Users (Admin only)
 - `GET /api/v1/users` - List all users
@@ -193,53 +189,49 @@ gcloud run deploy erp-frontend \
 
 ### Resources (Authenticated)
 - `GET/POST /api/v1/customers` - List/Create customers
-- `GET/PUT/DELETE /api/v1/customers/{id}` - CRUD operations
+- `GET/PUT /api/v1/customers/{id}` - Read/Update customer
 - Same pattern for: `products`, `orders`, `invoices`, `payments`
 
 ### Health
-- `GET /healthz` - Health check (no auth)
+- `GET /` - Service info
+- `GET /healthz` - Health check
 
-## 🔒 User Roles
+## 🔒 User Roles & Permissions
 
-| Role | Permissions |
-|------|-------------|
-| `admin` | Full access, user management |
-| `manager` | CRUD on all modules |
-| `staff` | CRUD on own data |
-| `viewer` | Read-only access |
+| Role | Create | Edit | Delete | Manage Users |
+|------|--------|------|--------|--------------|
+| `admin` | ✅ | ✅ | ✅ | ✅ |
+| `manager` | ✅ | ✅ | ✅ | ❌ |
+| `staff` | ✅ | ✅ | ❌ | ❌ |
+| `viewer` | ❌ | ❌ | ❌ | ❌ |
 
 ## 🚧 Roadmap
 
-### Phase 1: Production Hardening (Current)
-- [x] Fix CORS security
-- [x] Environment-based configuration
-- [x] Documentation cleanup
-- [ ] Disable public registration
-- [ ] Add rate limiting
+See [PRODUCTION_PLAN.md](PRODUCTION_PLAN.md) for detailed roadmap.
 
-### Phase 2: Feature Completion
-- [ ] Multiple line items per order/invoice
-- [ ] Password reset flow
-- [ ] Dashboard charts/analytics
-- [ ] Audit logging
+### Completed ✅
+- [x] Security hardening (CORS, env vars, disabled registration)
+- [x] Multiple line items for orders/invoices
+- [x] Role-based UI permissions
+- [x] Dashboard analytics
 
-### Phase 3: Quality & DevOps
-- [ ] Unit tests (pytest, jest)
-- [ ] E2E tests (Playwright)
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Error boundaries
+### Next Up
+- [ ] Rate limiting (with Redis)
+- [ ] Automated tests
+- [ ] CI/CD pipeline
+- [ ] Salesforce integration
 
 ## 📚 Additional Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - AI assistant guide & code patterns
+- **[PRODUCTION_PLAN.md](PRODUCTION_PLAN.md)** - Deployment roadmap & checklist
 - **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Feature implementation details
-- **[STANDARD_WORKFLOW.md](STANDARD_WORKFLOW.md)** - Development workflow
 
 ## 🤝 Contributing
 
 1. Create feature branch from `main`
 2. Make changes locally
-3. Test thoroughly
+3. Test thoroughly (`npm run build` for frontend)
 4. Commit with descriptive message
 5. Push and create PR
 
@@ -249,4 +241,4 @@ Private - CRM View
 
 ---
 
-*Last Updated: November 2024*
+*Last Updated: November 30, 2024*

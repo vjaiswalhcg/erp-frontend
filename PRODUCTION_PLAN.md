@@ -6,12 +6,14 @@ This document tracks the work needed to make the ERP system production-ready for
 
 ## Completed ✅
 
-### Security Fixes (Completed Nov 30, 2024)
+### Phase 1: Security Hardening (Completed Nov 30, 2024)
 - [x] Removed exposed credentials file (`notes.txt`)
 - [x] Removed build artifacts (`backend.zip`, `frontend.zip`)
 - [x] Fixed hardcoded API URL in frontend (now uses environment variable)
 - [x] Fixed CORS configuration (now uses environment variable, not `*`)
 - [x] Added `env.example` files for both backend and frontend
+- [x] **Disabled public registration** - `/register` endpoint commented out
+- [x] Added root endpoint (`/`) for service info and health check
 
 ### Documentation Cleanup (Completed Nov 30, 2024)
 - [x] Deleted 25+ outdated/duplicate documentation files
@@ -21,38 +23,52 @@ This document tracks the work needed to make the ERP system production-ready for
 - [x] Updated `CLAUDE.md` with correct paths
 - [x] Added `DEPRECATED.md` to old backend folder
 
+### Phase 2: Feature Completion (Completed Nov 30, 2024)
+- [x] **Multiple line items** for orders and invoices
+  - Dynamic add/remove line items in Order and Invoice dialogs
+  - Auto-populate price from product selection
+  - Live subtotal calculation
+- [x] **Granular role-based UI permissions**
+  - Created `usePermissions` hook
+  - Hide create/edit/delete buttons based on user role
+  - Applied to Customers, Products, Orders, Invoices, Payments tables
+- [x] **Dashboard analytics**
+  - Added stat cards with icons (Customers, Products, Orders, Revenue)
+  - Outstanding invoices and total payments metrics
+  - Orders by status breakdown
+  - Invoices by status breakdown
+  - Recent orders list (last 5)
+  - Recent payments list (last 5)
+
+### Deployment Fixes (Completed Nov 30, 2024)
+- [x] Fixed Next.js build-time environment variable issue
+  - Production API URL now hardcoded in `next.config.js` as fallback
+  - `NEXT_PUBLIC_*` variables are baked at build time, not runtime
+- [x] Removed `slowapi` rate limiting (causing container startup failures)
+  - Rate limiting can be re-added later with Redis backend
+- [x] Fixed TypeScript null check errors in dialog components
+- [x] Documented correct deployment URLs
+
+## Current Production URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | https://erp-frontend-377784510062.us-central1.run.app |
+| Backend | https://erp-backend-fb7fdd6n4a-uc.a.run.app |
+| API Docs | https://erp-backend-fb7fdd6n4a-uc.a.run.app/docs |
+
+> **Note:** There are two URL formats in Cloud Run. The backend uses the service-based URL (`fb7fdd6n4a-uc`), while the frontend uses the project-based URL.
+
 ## Remaining Work
 
-### Phase 1: Security Hardening (High Priority) ✅ COMPLETED
-- [x] **Disable public registration** - DONE Nov 30, 2024
-  - Removed `/auth/register` endpoint
-  - Users can only be created by admins via `/api/v1/users/`
-- [x] **Add rate limiting** on authentication endpoints - DONE Nov 30, 2024
-  - Added `slowapi` rate limiting
-  - Login: 5 attempts per minute per IP
-  - Token refresh: 10 attempts per minute per IP
-- [x] **Rotate all secrets** in production - DONE Nov 30, 2024
-  - Generated new SECRET_KEY during deployment
-  - CORS_ORIGINS set to exact frontend URL
-- [x] **Review CORS_ORIGINS** in production deployment - DONE Nov 30, 2024
-  - Set to `https://erp-frontend-377784510062.us-central1.run.app` only
-
-### Phase 2: Feature Completion (Medium Priority)
-- [ ] **Multiple line items** for orders and invoices
-  - Currently limited to single line item per order/invoice
-  - Need dynamic form with add/remove line items
-- [ ] **Password reset flow**
-  - Add forgot password endpoint
-  - Send reset email (requires email service integration)
-- [ ] **Granular role-based UI permissions**
-  - Hide edit/delete buttons for unauthorized roles
-  - Currently only admin link is role-gated
-- [ ] **Dashboard analytics**
-  - Add charts (revenue trends, order trends)
-  - Recent activity feed
-  - Top customers/products
-
 ### Phase 3: Quality & DevOps (Medium Priority)
+- [ ] **Rotate all secrets** in production
+  - Change DATABASE_URL password
+  - Generate new SECRET_KEY
+  - Document in secure location (not Git!)
+- [ ] **Add rate limiting** (with Redis backend)
+  - Use Redis or Cloud Memorystore for rate limit storage
+  - Prevents brute force attacks on login
 - [ ] **Add automated tests**
   - Backend: pytest with async support
   - Frontend: Jest + React Testing Library
@@ -68,6 +84,9 @@ This document tracks the work needed to make the ERP system production-ready for
   - Store in database or external service
 
 ### Phase 4: Advanced Features (Lower Priority)
+- [ ] **Password reset flow**
+  - Add forgot password endpoint
+  - Send reset email (requires email service integration)
 - [ ] **Salesforce Integration**
   - Named Credentials setup
   - Webhook endpoints for data sync
@@ -79,10 +98,32 @@ This document tracks the work needed to make the ERP system production-ready for
   - Order confirmation
   - Invoice sent
   - Payment received
-- [ ] **Search and filtering**
-  - Add search to all list views
+- [ ] **Enhanced search and filtering**
+  - Add search to all list views (Orders already has this)
   - Date range filters
   - Status filters
+
+## Deployment Commands
+
+### Backend Deployment
+```bash
+cd ~/erp-monorepo/backend
+git pull origin main
+
+gcloud run deploy erp-backend --source . --region us-central1 \
+  --update-env-vars="CORS_ORIGINS=https://erp-frontend-377784510062.us-central1.run.app"
+```
+
+### Frontend Deployment
+```bash
+cd ~/erp-monorepo/frontend
+git pull origin main
+
+gcloud run deploy erp-frontend --source . --region us-central1 \
+  --platform managed --allow-unauthenticated
+```
+
+> **Important:** The frontend `NEXT_PUBLIC_API_URL` is hardcoded in `next.config.js` for build-time availability. Cloud Run env vars alone don't work for Next.js public variables.
 
 ## Deployment Checklist
 
@@ -90,54 +131,52 @@ Before each production deployment:
 
 ### Pre-Deployment
 - [ ] All changes committed and pushed to GitHub
+- [ ] TypeScript compiles without errors (`npm run build`)
 - [ ] Environment variables updated if needed
-- [ ] Secrets rotated if compromised
 - [ ] Database migrations tested locally
 
 ### Deployment
 - [ ] Deploy backend first
-- [ ] Run database migrations
-- [ ] Verify backend health: `GET /healthz`
+- [ ] Run database migrations (if any)
+- [ ] Verify backend health: `curl https://erp-backend-fb7fdd6n4a-uc.a.run.app/`
 - [ ] Deploy frontend
 - [ ] Verify frontend loads
 
 ### Post-Deployment
 - [ ] Test login flow
-- [ ] Test CRUD operations
+- [ ] Test CRUD operations (create customer, order, etc.)
 - [ ] Check error handling
 - [ ] Monitor logs for errors
 
 ## Environment Configuration
 
-### Production Backend
+### Production Backend (Cloud Run Environment Variables)
 ```bash
-# Required
-DATABASE_URL=postgresql+psycopg_async://user:STRONG_PASSWORD@localhost/erp_demo?host=/cloudsql/PROJECT:REGION:INSTANCE
-SECRET_KEY=GENERATE_STRONG_RANDOM_32_CHAR_STRING
-CORS_ORIGINS=https://your-frontend-domain.run.app
-
-# Optional
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-REFRESH_TOKEN_EXPIRE_DAYS=7
+DATABASE_URL=postgresql+psycopg_async://user:PASSWORD@/erp_demo?host=/cloudsql/PROJECT:REGION:INSTANCE
+SECRET_KEY=your-secure-random-key-here
+CORS_ORIGINS=https://erp-frontend-377784510062.us-central1.run.app
 ```
 
 ### Production Frontend
-```bash
-NEXT_PUBLIC_API_URL=https://your-backend-domain.run.app/api/v1
+The API URL is configured in `next.config.js`:
+```javascript
+NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://erp-backend-fb7fdd6n4a-uc.a.run.app/api/v1'
 ```
 
-## Monitoring & Logging
+## Troubleshooting
 
-### Current State
-- Cloud Run provides basic logging
-- No alerting configured
-- No uptime monitoring
+### "Network Error" on frontend
+- Check if backend URL in `next.config.js` is correct
+- Verify CORS_ORIGINS on backend includes frontend URL
+- Check browser console for actual error
 
-### Recommended
-- [ ] Set up Cloud Monitoring alerts
-- [ ] Configure log-based metrics
-- [ ] Add uptime checks
-- [ ] Set up error notification (email/Slack)
+### Container fails to start
+- Check Cloud Run logs: `gcloud run services logs read SERVICE_NAME --region=us-central1 --limit=30`
+- Common causes: missing env vars (DATABASE_URL), import errors
+
+### TypeScript build fails
+- Run `npm run build` locally first
+- Check for null/undefined handling in optional chains
 
 ## Cost Estimate (Monthly)
 
@@ -152,4 +191,3 @@ NEXT_PUBLIC_API_URL=https://your-backend-domain.run.app/api/v1
 ---
 
 *Last Updated: November 30, 2024*
-
