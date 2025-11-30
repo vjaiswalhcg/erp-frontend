@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -52,6 +52,7 @@ interface InvoiceDialogProps {
 export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -88,13 +89,41 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
         title: "Success",
         description: "Invoice created successfully",
       });
+      setApiError(null);
       onOpenChange(false);
       form.reset();
     },
     onError: (error: any) => {
+      const detail = error?.response?.data?.detail;
+      let message = "Failed to create invoice";
+      const url = error?.config?.url;
+      const method = error?.config?.method?.toUpperCase?.();
+      if (Array.isArray(detail)) {
+        const first = detail[0] || {};
+        const loc = Array.isArray(first.loc) ? first.loc.join(" -> ") : undefined;
+        if (first.msg) {
+          message = loc ? `${first.msg} (${loc})` : first.msg;
+        }
+      } else if (typeof detail === "string" && detail.trim().length > 0) {
+        message = detail;
+      } else if (error?.response?.data) {
+        try {
+          message = JSON.stringify(error.response.data, null, 2);
+        } catch {
+          message = "Failed to create invoice (see console for details)";
+        }
+      } else if (error?.message) {
+        message = method && url ? `${error.message} (${method} ${url})` : error.message;
+      } else if (url) {
+        message = `Request failed (${method || "REQUEST"} ${url})`;
+      }
+      if (error?.response?.status) {
+        message = `[${error.response.status}] ${message}`;
+      }
+      setApiError(message);
       toast({
         title: "Error",
-        description: error.response?.data?.detail || "Failed to create invoice",
+        description: message,
         variant: "destructive",
       });
     },
@@ -129,6 +158,11 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
         <DialogHeader>
           <DialogTitle>Create Invoice</DialogTitle>
         </DialogHeader>
+        {apiError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {apiError}
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
