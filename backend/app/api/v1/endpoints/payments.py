@@ -12,6 +12,7 @@ from app.schemas.payment import (
     PaymentApplicationCreate,
     PaymentCreate,
     PaymentOut,
+    PaymentUpdate,
 )
 
 router = APIRouter(dependencies=[deps.get_auth()])
@@ -95,4 +96,53 @@ async def apply_payment(
     await db.commit()
     await db.refresh(payment, ["customer"])
     return payment
+
+
+@router.put("/{payment_id}", response_model=PaymentOut)
+async def update_payment(
+    payment_id: str, payload: PaymentUpdate, db: AsyncSession = Depends(deps.get_session)
+):
+    query = (
+        select(Payment)
+        .options(selectinload(Payment.customer))
+        .where(Payment.id == payment_id)
+    )
+    result = await db.execute(query)
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    customer = await db.get(Customer, payload.customer_id)
+    if not customer:
+        raise HTTPException(status_code=400, detail="Invalid customer")
+
+    if payload.invoice_id:
+        invoice = await db.get(Invoice, payload.invoice_id)
+        if not invoice:
+            raise HTTPException(status_code=400, detail="Invalid invoice")
+
+    payment.external_ref = payload.external_ref
+    payment.customer_id = payload.customer_id
+    payment.invoice_id = payload.invoice_id
+    payment.amount = payload.amount
+    payment.currency = payload.currency
+    payment.method = payload.method
+    payment.note = payload.note
+    payment.received_date = payload.received_date or payment.received_date
+    if payload.status:
+        payment.status = payload.status
+
+    await db.commit()
+    await db.refresh(payment, ["customer"])
+    return payment
+
+
+@router.delete("/{payment_id}", status_code=204)
+async def delete_payment(payment_id: str, db: AsyncSession = Depends(deps.get_session)):
+    payment = await db.get(Payment, payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    await db.delete(payment)
+    await db.commit()
+    return Response(status_code=204)
 

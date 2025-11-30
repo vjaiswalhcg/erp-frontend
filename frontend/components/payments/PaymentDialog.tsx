@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -7,7 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { paymentsApi } from "@/lib/api/payments";
 import { customersApi } from "@/lib/api/customers";
 import { invoicesApi } from "@/lib/api/invoices";
-import { Payment, PaymentCreate } from "@/lib/types/payment";
+import { Payment, PaymentCreate, PaymentUpdate } from "@/lib/types/payment";
 import {
   Dialog,
   DialogContent,
@@ -28,14 +29,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const paymentSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
-  payment_date: z.string(),
+  received_date: z.string(),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   currency: z.string().default("USD"),
-  payment_method: z.string().optional(),
-  reference_number: z.string().optional(),
-  notes: z.string().optional(),
+  method: z.string().optional(),
+  note: z.string().optional(),
   invoice_id: z.string().optional(),
-  amount_applied: z.coerce.number().min(0, "Applied amount must be positive").optional(),
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
@@ -49,6 +48,7 @@ interface PaymentDialogProps {
 export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -64,52 +64,99 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
     resolver: zodResolver(paymentSchema),
     defaultValues: {
       customer_id: "",
-      payment_date: new Date().toISOString().split('T')[0],
+      received_date: new Date().toISOString().split('T')[0],
       amount: 0,
       currency: "USD",
-      payment_method: "",
-      reference_number: "",
-      notes: "",
+      method: "",
+      note: "",
       invoice_id: "",
-      amount_applied: 0,
     },
   });
 
+  useEffect(() => {
+    if (!payment) {
+      form.reset({
+        customer_id: "",
+        received_date: new Date().toISOString().split("T")[0],
+        amount: 0,
+        currency: "USD",
+        method: "",
+        note: "",
+        invoice_id: "",
+      });
+      setApiError(null);
+      return;
+    }
+    form.reset({
+      customer_id: payment.customer_id,
+      received_date: payment.received_date.split("T")[0],
+      amount: payment.amount,
+      currency: payment.currency,
+      method: payment.method || "",
+      note: payment.note || "",
+      invoice_id: payment.invoice_id || "",
+    });
+    setApiError(null);
+  }, [payment, form]);
+
   const createMutation = useMutation({
-    mutationFn: paymentsApi.create,
+    mutationFn: (payload: PaymentCreate | PaymentUpdate) =>
+      payment ? paymentsApi.update(payment.id, payload as PaymentUpdate) : paymentsApi.create(payload as PaymentCreate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] });
       toast({
         title: "Success",
-        description: "Payment created successfully",
+        description: payment ? "Payment updated successfully" : "Payment created successfully",
       });
+      setApiError(null);
       onOpenChange(false);
       form.reset();
     },
     onError: (error: any) => {
+      const detail = error?.response?.data?.detail;
+      let message = "Failed to save payment";
+      const url = error?.config?.url;
+      const method = error?.config?.method?.toUpperCase?.();
+      if (Array.isArray(detail)) {
+        const first = detail[0] || {};
+        const loc = Array.isArray(first.loc) ? first.loc.join(" -> ") : undefined;
+        if (first.msg) {
+          message = loc ? `${first.msg} (${loc})` : first.msg;
+        }
+      } else if (typeof detail === "string" && detail.trim().length > 0) {
+        message = detail;
+      } else if (error?.response?.data) {
+        try {
+          message = JSON.stringify(error.response.data, null, 2);
+        } catch {
+          message = "Failed to save payment (see console for details)";
+        }
+      } else if (error?.message) {
+        message = method && url ? `${error.message} (${method} ${url})` : error.message;
+      } else if (url) {
+        message = `Request failed (${method || "REQUEST"} ${url})`;
+      }
+      if (error?.response?.status) {
+        message = `[${error.response.status}] ${message}`;
+      }
+      setApiError(message);
       toast({
         title: "Error",
-        description: error.response?.data?.detail || "Failed to create payment",
+        description: message,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: PaymentFormValues) => {
-    const payload: PaymentCreate = {
+    const payload: PaymentCreate | PaymentUpdate = {
       customer_id: data.customer_id,
-      payment_date: data.payment_date,
+      invoice_id: data.invoice_id || undefined,
+      received_date: data.received_date,
       amount: data.amount,
       currency: data.currency,
-      payment_method: data.payment_method || undefined,
-      reference_number: data.reference_number || undefined,
-      notes: data.notes || undefined,
-      applications: data.invoice_id && data.amount_applied ? [
-        {
-          invoice_id: data.invoice_id,
-          amount_applied: data.amount_applied,
-        }
-      ] : undefined,
+      method: data.method || undefined,
+      note: data.note || undefined,
     };
 
     createMutation.mutate(payload);
@@ -119,8 +166,13 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create Payment</DialogTitle>
+          <DialogTitle>{payment ? "Edit Payment" : "Create Payment"}</DialogTitle>
         </DialogHeader>
+        {apiError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {apiError}
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -145,7 +197,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="payment_date"
+                name="received_date"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Payment Date *</FormLabel>
@@ -175,7 +227,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="payment_method"
+                name="method"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Payment Method</FormLabel>
@@ -196,12 +248,12 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
 
               <FormField
                 control={form.control}
-                name="reference_number"
+                name="note"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reference Number</FormLabel>
+                    <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Transaction ref" />
+                      <Input {...field} placeholder="Optional notes" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -230,40 +282,12 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="amount_applied"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount Applied to Invoice</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="number" step="0.01" min="0" placeholder="0.00" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Optional notes" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                Create Payment
+                {payment ? "Save Changes" : "Create Payment"}
               </Button>
             </div>
           </form>

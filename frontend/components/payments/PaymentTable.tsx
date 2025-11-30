@@ -99,11 +99,11 @@ export function PaymentTable() {
             ) : (
               payments?.map((payment) => (
                 <TableRow key={payment.id}>
-                  <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{new Date(payment.received_date).toLocaleDateString()}</TableCell>
                   <TableCell>{payment.customer?.name || payment.customer_id}</TableCell>
                   <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
-                  <TableCell>{payment.payment_method || "-"}</TableCell>
-                  <TableCell>{payment.reference_number || "-"}</TableCell>
+                  <TableCell>{payment.method || "-"}</TableCell>
+                  <TableCell>{payment.note || "-"}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
