@@ -46,11 +46,17 @@ const navItems = [
     href: "/dashboard/payments",
     icon: CreditCard,
   },
+  {
+    title: "Admin",
+    href: "/dashboard/admin/users",
+    icon: LayoutDashboard,
+    adminOnly: true,
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-white/10 bg-gradient-to-b from-slate-900 via-slate-950 to-black text-slate-100 shadow-xl">
@@ -67,6 +73,9 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
+          if (item.adminOnly && user?.role !== "admin") {
+            return null;
+          }
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
