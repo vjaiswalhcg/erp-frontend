@@ -12,6 +12,9 @@ export interface UserUpdatePayload {
   password?: string;
   role?: User["role"];
   is_active?: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
 }
 
 export const usersApi = {
