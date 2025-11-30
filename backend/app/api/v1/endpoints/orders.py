@@ -101,8 +101,16 @@ async def create_order(
     )
     db.add(order)
     await db.commit()
-    await db.refresh(order, ["lines", "customer"])
-    return order
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.lines).selectinload(OrderLine.product),
+            selectinload(Order.customer),
+        )
+        .where(Order.id == order.id)
+    )
+    result = await db.execute(query)
+    return result.scalar_one()
 
 
 @router.delete("/{order_id}", status_code=204)
