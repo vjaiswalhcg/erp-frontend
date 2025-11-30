@@ -53,7 +53,18 @@ export interface InvoiceCreate {
 
 export interface InvoiceUpdate {
   external_ref?: string;
+  customer_id?: string;
+  order_id?: string | null;
+  invoice_date?: string;
   due_date?: string;
   status?: "draft" | "posted" | "paid" | "written_off";
   notes?: string;
+  currency?: string;
+  lines?: {
+    description?: string;
+    product_id?: string | null;
+    quantity: number;
+    unit_price: number;
+    tax_rate?: number;
+  }[];
 }

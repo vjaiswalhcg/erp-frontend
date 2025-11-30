@@ -8,7 +8,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { invoicesApi } from "@/lib/api/invoices";
 import { customersApi } from "@/lib/api/customers";
 import { ordersApi } from "@/lib/api/orders";
-import { Invoice, InvoiceCreate } from "@/lib/types/invoice";
+import { Invoice, InvoiceCreate, InvoiceUpdate } from "@/lib/types/invoice";
 import {
   Dialog,
   DialogContent,
@@ -81,13 +81,51 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
     },
   });
 
+  useEffect(() => {
+    if (!invoice) {
+      form.reset({
+        customer_id: "",
+        order_id: "",
+        invoice_date: new Date().toISOString().split("T")[0],
+        due_date: "",
+        status: "draft",
+        tax_total: 0,
+        currency: "USD",
+        notes: "",
+        description: "",
+        quantity: 1,
+        unit_price: 0,
+      });
+      setApiError(null);
+      return;
+    }
+    const firstLine = invoice.lines?.[0];
+    form.reset({
+      customer_id: invoice.customer_id,
+      order_id: invoice.order_id || "",
+      invoice_date: invoice.invoice_date.split("T")[0],
+      due_date: invoice.due_date ? invoice.due_date.split("T")[0] : "",
+      status: invoice.status as InvoiceFormValues["status"],
+      tax_total: invoice.tax_total || 0,
+      currency: invoice.currency,
+      notes: invoice.notes || "",
+      description: firstLine?.description || "",
+      quantity: firstLine ? Number(firstLine.quantity) : 1,
+      unit_price: firstLine ? Number(firstLine.unit_price) : 0,
+    });
+    setApiError(null);
+  }, [invoice, form]);
+
   const createMutation = useMutation({
-    mutationFn: invoicesApi.create,
+    mutationFn: (payload: InvoiceCreate | InvoiceUpdate) =>
+      invoice
+        ? invoicesApi.update(invoice.id, payload as InvoiceUpdate)
+        : invoicesApi.create(payload as InvoiceCreate),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       toast({
         title: "Success",
-        description: "Invoice created successfully",
+        description: invoice ? "Invoice updated successfully" : "Invoice created successfully",
       });
       setApiError(null);
       onOpenChange(false);
@@ -95,7 +133,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
     },
     onError: (error: any) => {
       const detail = error?.response?.data?.detail;
-      let message = "Failed to create invoice";
+      let message = "Failed to save invoice";
       const url = error?.config?.url;
       const method = error?.config?.method?.toUpperCase?.();
       if (Array.isArray(detail)) {
@@ -130,7 +168,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
   });
 
   const onSubmit = (data: InvoiceFormValues) => {
-    const payload: InvoiceCreate = {
+    const payload: InvoiceCreate | InvoiceUpdate = {
       customer_id: data.customer_id,
       order_id: data.order_id || undefined,
       invoice_date: data.invoice_date,
@@ -156,7 +194,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create Invoice</DialogTitle>
+          <DialogTitle>{invoice ? "Edit Invoice" : "Create Invoice"}</DialogTitle>
         </DialogHeader>
         {apiError && (
           <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -333,7 +371,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                Create Invoice
+                {invoice ? "Save Changes" : "Create Invoice"}
               </Button>
             </div>
           </form>

@@ -59,6 +59,10 @@ class InvoiceCreate(InvoiceBase):
     lines: list[InvoiceLineCreate] | None = None
 
 
+class InvoiceUpdate(InvoiceBase):
+    lines: list[InvoiceLineCreate] | None = None
+
+
 class InvoiceOut(InvoiceBase):
     id: uuid.UUID
     invoice_date: datetime

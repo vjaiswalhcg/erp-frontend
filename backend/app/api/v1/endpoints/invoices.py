@@ -10,7 +10,7 @@ from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceLine, InvoiceStatus
 from app.models.order import Order
 from app.models.product import Product
-from app.schemas.invoice import InvoiceCreate, InvoiceOut
+from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 
 router = APIRouter(dependencies=[deps.get_auth()])
 
@@ -122,6 +122,71 @@ async def create_invoice(
         lines=lines,
     )
     db.add(invoice)
+    await db.commit()
+    await db.refresh(invoice, ["lines", "customer"])
+    return invoice
+
+
+@router.put("/{invoice_id}", response_model=InvoiceOut)
+async def update_invoice(
+    invoice_id: str, payload: InvoiceUpdate, db: AsyncSession = Depends(deps.get_session)
+):
+    result = await db.execute(
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.customer),
+        )
+        .where(Invoice.id == invoice_id)
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    customer = await db.get(Customer, payload.customer_id)
+    if not customer:
+        raise HTTPException(status_code=400, detail="Invalid customer")
+
+    # If lines provided, rebuild
+    if payload.lines is not None:
+        new_lines: list[InvoiceLine] = []
+        subtotal = 0
+        tax_total = 0
+        for line in payload.lines:
+            product = None
+            if line.product_id:
+                product = await db.get(Product, line.product_id)
+                if not product:
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid product {line.product_id}"
+                    )
+            line_total = float(line.quantity) * float(line.unit_price)
+            tax_amount = line_total * float(line.tax_rate)
+            subtotal += line_total
+            tax_total += tax_amount
+            new_lines.append(
+                InvoiceLine(
+                    product_id=line.product_id,
+                    description=line.description,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    tax_rate=line.tax_rate,
+                    line_total=line_total + tax_amount,
+                )
+            )
+        invoice.lines = new_lines
+        invoice.subtotal = subtotal
+        invoice.tax_total = tax_total
+        invoice.total = subtotal + tax_total
+
+    invoice.customer_id = payload.customer_id
+    invoice.order_id = payload.order_id
+    invoice.currency = payload.currency
+    invoice.invoice_date = payload.invoice_date or invoice.invoice_date
+    invoice.due_date = payload.due_date
+    invoice.status = payload.status or invoice.status
+    invoice.notes = payload.notes
+
     await db.commit()
     await db.refresh(invoice, ["lines", "customer"])
     return invoice
