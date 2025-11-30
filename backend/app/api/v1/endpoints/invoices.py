@@ -259,3 +259,15 @@ async def _transition_invoice(
     await db.refresh(invoice, ["lines", "customer"])
     return invoice
 
+
+@router.delete("/{invoice_id}", status_code=204)
+async def delete_invoice(
+    invoice_id: str, db: AsyncSession = Depends(deps.get_session)
+):
+    invoice = await db.get(Invoice, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    await db.delete(invoice)
+    await db.commit()
+    return Response(status_code=204)
+
