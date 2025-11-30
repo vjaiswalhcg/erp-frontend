@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -108,6 +108,8 @@ async def create_invoice(
                 line_total=line_total + tax_amount,
             )
         )
+    if payload.tax_total is not None:
+        tax_total = float(payload.tax_total)
 
     invoice = Invoice(
         external_ref=payload.external_ref,
@@ -185,8 +187,13 @@ async def update_invoice(
             )
         invoice.lines = new_lines
         invoice.subtotal = subtotal
-        invoice.tax_total = tax_total
-        invoice.total = subtotal + tax_total
+        invoice.tax_total = (
+            float(payload.tax_total) if payload.tax_total is not None else tax_total
+        )
+        invoice.total = invoice.subtotal + invoice.tax_total
+    elif payload.tax_total is not None:
+        invoice.tax_total = float(payload.tax_total)
+        invoice.total = invoice.subtotal + invoice.tax_total
 
     invoice.customer_id = payload.customer_id
     invoice.order_id = payload.order_id
@@ -277,8 +284,9 @@ async def delete_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     # Delete payment applications that reference this invoice to avoid FK errors
-    for pa in list(invoice.payment_applications or []):
-        await db.delete(pa)
+    await db.execute(
+        delete(PaymentApplication).where(PaymentApplication.invoice_id == invoice_id)
+    )
     await db.delete(invoice)
     await db.commit()
     return Response(status_code=204)

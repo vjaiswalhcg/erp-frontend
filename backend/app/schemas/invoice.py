@@ -34,6 +34,7 @@ class InvoiceBase(BaseModel):
     due_date: datetime | None = None
     invoice_date: datetime | date | str | None = None
     notes: str | None = None
+    tax_total: float | None = None
 
     @validator("invoice_date", "due_date", pre=True)
     def _coerce_dates(cls, v):
