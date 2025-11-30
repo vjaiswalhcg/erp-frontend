@@ -19,6 +19,8 @@ async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 @router.post("/register", response_model=UserOut)
 async def register_user(payload: UserCreate, db: AsyncSession = Depends(deps.get_session)):
+    if len(payload.password) > 72:
+        raise HTTPException(status_code=400, detail="Password too long (max 72 chars)")
     existing = await _get_user_by_email(db, payload.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
