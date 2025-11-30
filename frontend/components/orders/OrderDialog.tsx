@@ -98,7 +98,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       return;
     }
     
-    const lines = order.lines?.length > 0 
+    const lines = (order.lines && order.lines.length > 0)
       ? order.lines.map(line => ({
           product_id: line.product_id,
           quantity: Number(line.quantity),

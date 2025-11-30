@@ -115,7 +115,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
       return;
     }
 
-    const lines = invoice.lines?.length > 0 
+    const lines = (invoice.lines && invoice.lines.length > 0)
       ? invoice.lines.map(line => ({
           product_id: line.product_id || "",
           description: line.description || "",
