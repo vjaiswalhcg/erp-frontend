@@ -2,8 +2,6 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.api import deps
 from app.core import auth
@@ -12,9 +10,6 @@ from app.models.user import User, UserRole
 from app.schemas.user import UserOut, UserLogin, Token, TokenRefresh
 
 router = APIRouter()
-
-# Rate limiter - 5 attempts per minute for auth endpoints
-limiter = Limiter(key_func=get_remote_address)
 
 
 async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
@@ -33,8 +28,8 @@ async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 @router.post("/login", response_model=Token)
-@limiter.limit("5/minute")
 async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(deps.get_session)):
+    """Login endpoint - returns access and refresh tokens."""
     user = await _get_user_by_email(db, payload.email)
     if not user or not auth.verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -48,8 +43,8 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
 
 
 @router.post("/refresh", response_model=Token)
-@limiter.limit("10/minute")
 async def refresh(request: Request, payload: TokenRefresh, db: AsyncSession = Depends(deps.get_session)):
+    """Refresh access token using refresh token."""
     user_id = auth.decode_token(payload.refresh_token, refresh=True)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -62,4 +57,5 @@ async def refresh(request: Request, payload: TokenRefresh, db: AsyncSession = De
 
 @router.get("/me", response_model=UserOut)
 async def read_me(current_user: User = Depends(deps.get_auth)):
+    """Get current authenticated user."""
     return current_user
