@@ -10,3 +10,5 @@ passlib[bcrypt]==1.7.4
 python-jose==3.3.0
 # bcrypt 4.x removed __about__ attribute used by passlib; pin to 3.2.2
 bcrypt==3.2.2
+# Rate limiting
+slowapi==0.1.9

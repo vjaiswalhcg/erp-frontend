@@ -1,15 +1,20 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api import deps
 from app.core import auth
 from app.core.config import settings
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserOut, UserLogin, Token, TokenRefresh
+from app.schemas.user import UserOut, UserLogin, Token, TokenRefresh
 
 router = APIRouter()
+
+# Rate limiter - 5 attempts per minute for auth endpoints
+limiter = Limiter(key_func=get_remote_address)
 
 
 async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
@@ -17,29 +22,19 @@ async def _get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-@router.post("/register", response_model=UserOut)
-async def register_user(payload: UserCreate, db: AsyncSession = Depends(deps.get_session)):
-    if len(payload.password) > 72:
-        raise HTTPException(status_code=400, detail="Password too long (max 72 chars)")
-    existing = await _get_user_by_email(db, payload.email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # For simplicity, allow open registration but default to viewer unless explicitly provided
-    hashed = auth.get_password_hash(payload.password)
-    user = User(
-        email=payload.email,
-        hashed_password=hashed,
-        role=payload.role or UserRole.viewer,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+# NOTE: Public registration has been DISABLED for security.
+# Users must be created by an admin via POST /api/v1/users/
+# To re-enable, uncomment the register_user endpoint below.
+#
+# @router.post("/register", response_model=UserOut)
+# async def register_user(payload: UserCreate, db: AsyncSession = Depends(deps.get_session)):
+#     """Public registration - DISABLED for production security."""
+#     ...
 
 
 @router.post("/login", response_model=Token)
-async def login(payload: UserLogin, db: AsyncSession = Depends(deps.get_session)):
+@limiter.limit("5/minute")
+async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(deps.get_session)):
     user = await _get_user_by_email(db, payload.email)
     if not user or not auth.verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -53,7 +48,8 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(deps.get_session)
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh(payload: TokenRefresh, db: AsyncSession = Depends(deps.get_session)):
+@limiter.limit("10/minute")
+async def refresh(request: Request, payload: TokenRefresh, db: AsyncSession = Depends(deps.get_session)):
     user_id = auth.decode_token(payload.refresh_token, refresh=True)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

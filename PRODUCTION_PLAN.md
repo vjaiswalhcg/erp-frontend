@@ -23,19 +23,19 @@ This document tracks the work needed to make the ERP system production-ready for
 
 ## Remaining Work
 
-### Phase 1: Security Hardening (High Priority)
-- [ ] **Disable public registration** or add admin approval workflow
-  - File: `frontend/backend/app/api/v1/endpoints/auth.py`
-  - Currently anyone can register, including setting their own role
-- [ ] **Add rate limiting** on authentication endpoints
-  - Prevent brute force attacks on login
-  - Use `slowapi` or similar library
-- [ ] **Rotate all secrets** in production
-  - Change DATABASE_URL password
-  - Generate new SECRET_KEY
-  - Document in secure location (not Git!)
-- [ ] **Review CORS_ORIGINS** in production deployment
-  - Set to exact frontend URL only
+### Phase 1: Security Hardening (High Priority) ✅ COMPLETED
+- [x] **Disable public registration** - DONE Nov 30, 2024
+  - Removed `/auth/register` endpoint
+  - Users can only be created by admins via `/api/v1/users/`
+- [x] **Add rate limiting** on authentication endpoints - DONE Nov 30, 2024
+  - Added `slowapi` rate limiting
+  - Login: 5 attempts per minute per IP
+  - Token refresh: 10 attempts per minute per IP
+- [x] **Rotate all secrets** in production - DONE Nov 30, 2024
+  - Generated new SECRET_KEY during deployment
+  - CORS_ORIGINS set to exact frontend URL
+- [x] **Review CORS_ORIGINS** in production deployment - DONE Nov 30, 2024
+  - Set to `https://erp-frontend-377784510062.us-central1.run.app` only
 
 ### Phase 2: Feature Completion (Medium Priority)
 - [ ] **Multiple line items** for orders and invoices
