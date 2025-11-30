@@ -10,6 +10,7 @@ from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceLine, InvoiceStatus
 from app.models.order import Order
 from app.models.product import Product
+from app.models.payment import PaymentApplication
 from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 
 router = APIRouter(dependencies=[deps.get_auth()])
@@ -264,9 +265,20 @@ async def _transition_invoice(
 async def delete_invoice(
     invoice_id: str, db: AsyncSession = Depends(deps.get_session)
 ):
-    invoice = await db.get(Invoice, invoice_id)
+    result = await db.execute(
+        select(Invoice)
+        .options(
+            selectinload(Invoice.payment_applications),
+            selectinload(Invoice.lines),
+        )
+        .where(Invoice.id == invoice_id)
+    )
+    invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    # Delete payment applications that reference this invoice to avoid FK errors
+    for pa in list(invoice.payment_applications or []):
+        await db.delete(pa)
     await db.delete(invoice)
     await db.commit()
     return Response(status_code=204)
