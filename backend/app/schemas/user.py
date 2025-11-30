@@ -9,12 +9,18 @@ class UserBase(BaseModel):
     email: EmailStr
     role: UserRole = UserRole.viewer
     is_active: bool = True
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     role: UserRole = UserRole.viewer
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -22,6 +28,9 @@ class UserUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=6)
     role: UserRole | None = None
     is_active: bool | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
 
 
 class UserOut(UserBase):

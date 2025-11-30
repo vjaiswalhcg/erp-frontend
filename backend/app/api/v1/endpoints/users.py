@@ -39,6 +39,9 @@ async def create_user(payload: UserCreate, db: AsyncSession = Depends(deps.get_s
         email=payload.email,
         hashed_password=hashed,
         role=payload.role or UserRole.viewer,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        phone=payload.phone,
         is_active=True,
     )
     db.add(user)
@@ -70,6 +73,9 @@ async def update_user(
         user.role = payload.role
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    user.first_name = payload.first_name
+    user.last_name = payload.last_name
+    user.phone = payload.phone
 
     await db.commit()
     await db.refresh(user)

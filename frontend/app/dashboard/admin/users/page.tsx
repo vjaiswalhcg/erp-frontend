@@ -32,6 +32,9 @@ const userSchema = z.object({
   password: z.string().min(6).optional(),
   role: z.enum(["admin", "manager", "staff", "viewer"]),
   is_active: z.boolean().default(true),
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userSchema>;
@@ -56,6 +59,9 @@ export default function AdminUsersPage() {
       password: "",
       role: "viewer",
       is_active: true,
+      first_name: "",
+      last_name: "",
+      phone: "",
     },
   });
 
@@ -66,6 +72,9 @@ export default function AdminUsersPage() {
           email: values.email,
           role: values.role as UserRole,
           is_active: values.is_active,
+          first_name: values.first_name,
+          last_name: values.last_name,
+          phone: values.phone,
         };
         if (values.password) {
           payload.password = values.password;
@@ -76,6 +85,9 @@ export default function AdminUsersPage() {
           email: values.email,
           password: values.password || "",
           role: values.role as UserRole,
+          first_name: values.first_name,
+          last_name: values.last_name,
+          phone: values.phone,
         };
         return usersApi.create(payload);
       }
@@ -112,6 +124,9 @@ export default function AdminUsersPage() {
       password: "",
       role: user.role,
       is_active: user.is_active,
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      phone: user.phone || "",
     });
     setIsDialogOpen(true);
   };
@@ -123,6 +138,9 @@ export default function AdminUsersPage() {
       password: "",
       role: "viewer",
       is_active: true,
+      first_name: "",
+      last_name: "",
+      phone: "",
     });
     setIsDialogOpen(true);
   };
@@ -245,6 +263,49 @@ export default function AdminUsersPage() {
                     <FormLabel>Password {selectedUser ? "(leave blank to keep)" : ""}</FormLabel>
                     <FormControl>
                       <Input {...field} type="password" placeholder="********" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="first_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="First name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Last name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
