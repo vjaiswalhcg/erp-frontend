@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -26,6 +26,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+
+const lineItemSchema = z.object({
+  product_id: z.string().min(1, "Product is required"),
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
+  unit_price: z.coerce.number().min(0, "Price must be positive"),
+  tax_rate: z.coerce.number().min(0).default(0),
+});
 
 const orderSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
@@ -33,9 +42,7 @@ const orderSchema = z.object({
   status: z.enum(["draft", "confirmed", "fulfilled", "closed"]).default("draft"),
   currency: z.string().default("USD"),
   notes: z.string().optional(),
-  product_id: z.string().min(1, "Product is required"),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
-  unit_price: z.coerce.number().min(0, "Price must be positive"),
+  lines: z.array(lineItemSchema).min(1, "At least one line item is required"),
 });
 
 type OrderFormValues = z.infer<typeof orderSchema>;
@@ -69,10 +76,13 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       status: "draft",
       currency: "USD",
       notes: "",
-      product_id: "",
-      quantity: 1,
-      unit_price: 0,
+      lines: [{ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "lines",
   });
 
   useEffect(() => {
@@ -83,22 +93,27 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         status: "draft",
         currency: "USD",
         notes: "",
-        product_id: "",
-        quantity: 1,
-        unit_price: 0,
+        lines: [{ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
       });
       return;
     }
-    const firstLine = order.lines?.[0];
+    
+    const lines = order.lines?.length > 0 
+      ? order.lines.map(line => ({
+          product_id: line.product_id,
+          quantity: Number(line.quantity),
+          unit_price: Number(line.unit_price),
+          tax_rate: Number(line.tax_rate || 0),
+        }))
+      : [{ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 }];
+
     form.reset({
       customer_id: order.customer_id,
       order_date: order.order_date.split("T")[0],
       status: order.status,
       currency: order.currency,
       notes: order.notes || "",
-      product_id: firstLine?.product_id || "",
-      quantity: firstLine ? Number(firstLine.quantity) : 1,
-      unit_price: firstLine ? Number(firstLine.unit_price) : 0,
+      lines,
     });
     setApiError(null);
   }, [order, form]);
@@ -119,11 +134,8 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       form.reset();
     },
     onError: (error: any) => {
-      // Try to surface validation details from FastAPI/Pydantic or raw body
       const detail = error?.response?.data?.detail;
       let message = "Failed to save order";
-      const url = error?.config?.url;
-      const method = error?.config?.method?.toUpperCase?.();
       if (Array.isArray(detail)) {
         const first = detail[0] || {};
         const loc = Array.isArray(first.loc) ? first.loc.join(" -> ") : undefined;
@@ -132,19 +144,6 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         }
       } else if (typeof detail === "string" && detail.trim().length > 0) {
         message = detail;
-      } else if (error?.response?.data) {
-        try {
-          message = JSON.stringify(error.response.data, null, 2);
-        } catch {
-          message = "Failed to save order (see console for details)";
-        }
-      } else if (error?.message) {
-        message = error.message;
-        if (url) {
-          message = `${message} (${method || "REQUEST"} ${url})`;
-        }
-      } else if (url) {
-        message = `Request failed (${method || "REQUEST"} ${url})`;
       }
       if (error?.response?.status) {
         message = `[${error.response.status}] ${message}`;
@@ -165,22 +164,27 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       status: data.status as Order["status"],
       currency: data.currency,
       notes: data.notes,
-      lines: [
-        {
-          product_id: data.product_id,
-          quantity: data.quantity,
-          unit_price: data.unit_price,
-          tax_rate: 0,
-        },
-      ],
+      lines: data.lines,
     };
-
     mutation.mutate(payload);
+  };
+
+  // Calculate totals
+  const watchedLines = form.watch("lines");
+  const subtotal = watchedLines?.reduce((sum, line) => {
+    return sum + (Number(line.quantity) || 0) * (Number(line.unit_price) || 0);
+  }, 0) || 0;
+
+  const handleProductChange = (index: number, productId: string) => {
+    const product = products?.find(p => p.id === productId);
+    if (product) {
+      form.setValue(`lines.${index}.unit_price`, product.price);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{order ? "Edit Order" : "Create Order"}</DialogTitle>
         </DialogHeader>
@@ -237,7 +241,6 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
                         <option value="confirmed">Confirmed</option>
                         <option value="fulfilled">Fulfilled</option>
                         <option value="closed">Closed</option>
-                        <option value="closed">Closed</option>
                       </select>
                     </FormControl>
                     <FormMessage />
@@ -246,60 +249,104 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="product_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product *</FormLabel>
-                  <FormControl>
-                    <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
-                      onChange={(e) => {
-                        field.onChange(e);
-                        const product = products?.find(p => p.id === e.target.value);
-                        if (product) {
-                          form.setValue('unit_price', product.price);
-                        }
-                      }}>
-                      <option value="">Select product</option>
-                      {products?.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} - {p.price}</option>
-                      ))}
-                    </select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            {/* Line Items Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <FormLabel>Line Items *</FormLabel>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 })}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add Line
+                </Button>
+              </div>
+              
+              <div className="rounded-md border">
+                <div className="grid grid-cols-12 gap-2 bg-muted/50 p-2 text-xs font-medium">
+                  <div className="col-span-5">Product</div>
+                  <div className="col-span-2">Qty</div>
+                  <div className="col-span-2">Price</div>
+                  <div className="col-span-2">Total</div>
+                  <div className="col-span-1"></div>
+                </div>
+                
+                {fields.map((field, index) => {
+                  const lineTotal = (Number(watchedLines?.[index]?.quantity) || 0) * 
+                                    (Number(watchedLines?.[index]?.unit_price) || 0);
+                  return (
+                    <div key={field.id} className="grid grid-cols-12 gap-2 p-2 border-t items-center">
+                      <div className="col-span-5">
+                        <FormField
+                          control={form.control}
+                          name={`lines.${index}.product_id`}
+                          render={({ field }) => (
+                            <select 
+                              {...field} 
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+                              onChange={(e) => {
+                                field.onChange(e);
+                                handleProductChange(index, e.target.value);
+                              }}
+                            >
+                              <option value="">Select...</option>
+                              {products?.map((p) => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`lines.${index}.quantity`}
+                          render={({ field }) => (
+                            <Input {...field} type="number" min="1" className="h-9" />
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`lines.${index}.unit_price`}
+                          render={({ field }) => (
+                            <Input {...field} type="number" step="0.01" min="0" className="h-9" />
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-2 text-sm font-medium">
+                        {formatCurrency(lineTotal)}
+                      </div>
+                      <div className="col-span-1">
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Totals */}
+                <div className="grid grid-cols-12 gap-2 p-2 border-t bg-muted/30">
+                  <div className="col-span-9 text-right font-medium">Subtotal:</div>
+                  <div className="col-span-2 font-bold">{formatCurrency(subtotal)}</div>
+                  <div className="col-span-1"></div>
+                </div>
+              </div>
+              {form.formState.errors.lines && (
+                <p className="text-sm text-destructive">{form.formState.errors.lines.message}</p>
               )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity *</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" min="1" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="unit_price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unit Price *</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="number" step="0.01" min="0" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <FormField

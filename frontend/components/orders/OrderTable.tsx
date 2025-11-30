@@ -25,6 +25,7 @@ import {
 import { Pencil, Trash2, Plus } from "lucide-react";
 import { OrderDialog } from "./OrderDialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export function OrderTable() {
@@ -40,6 +41,7 @@ export function OrderTable() {
   const pageSize = 10;
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canEdit, canDelete } = usePermissions();
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ["orders"],
@@ -155,10 +157,12 @@ export function OrderTable() {
             Track, filter, and manage recent orders.
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Order
-        </Button>
+        {canCreate && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Order
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -279,21 +283,25 @@ export function OrderTable() {
                     {formatCurrency(Number(order.total), order.currency)}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(order)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(order.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(order)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(order.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

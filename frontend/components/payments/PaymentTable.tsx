@@ -16,6 +16,7 @@ import {
 import { Pencil, Trash2, Plus } from "lucide-react";
 import { PaymentDialog } from "./PaymentDialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/utils";
 
 export function PaymentTable() {
@@ -23,6 +24,7 @@ export function PaymentTable() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { canCreate, canEdit, canDelete } = usePermissions();
 
   const { data: payments, isLoading } = useQuery({
     queryKey: ["payments"],
@@ -71,10 +73,12 @@ export function PaymentTable() {
     <div>
       <div className="mb-4 flex justify-between">
         <h2 className="text-2xl font-bold">Payments</h2>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Payment
-        </Button>
+        {canCreate && (
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Payment
+          </Button>
+        )}
       </div>
 
       <div className="rounded-md border">
@@ -105,21 +109,25 @@ export function PaymentTable() {
                   <TableCell>{payment.method || "-"}</TableCell>
                   <TableCell>{payment.note || "-"}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(payment)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(payment.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(payment)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(payment.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
