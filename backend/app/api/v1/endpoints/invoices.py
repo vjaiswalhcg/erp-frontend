@@ -123,8 +123,16 @@ async def create_invoice(
     )
     db.add(invoice)
     await db.commit()
-    await db.refresh(invoice, ["lines", "customer"])
-    return invoice
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.customer),
+        )
+        .where(Invoice.id == invoice.id)
+    )
+    result = await db.execute(query)
+    return result.scalar_one()
 
 
 @router.put("/{invoice_id}", response_model=InvoiceOut)
@@ -188,8 +196,16 @@ async def update_invoice(
     invoice.notes = payload.notes
 
     await db.commit()
-    await db.refresh(invoice, ["lines", "customer"])
-    return invoice
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.customer),
+        )
+        .where(Invoice.id == invoice.id)
+    )
+    result = await db.execute(query)
+    return result.scalar_one()
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
