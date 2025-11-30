@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +12,7 @@ import {
   ShoppingCart,
   FileText,
   CreditCard,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
@@ -47,6 +50,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
@@ -75,6 +79,11 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="border-t p-3">
+        <Button variant="ghost" className="w-full justify-start gap-2" onClick={logout}>
+          <LogOut className="h-4 w-4" /> Logout
+        </Button>
+      </div>
     </div>
   );
 }

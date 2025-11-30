@@ -1,0 +1,41 @@
+import uuid
+from datetime import datetime
+from pydantic import BaseModel, EmailStr, Field
+
+from app.models.user import UserRole
+
+
+class UserBase(BaseModel):
+    email: EmailStr
+    role: UserRole = UserRole.viewer
+    is_active: bool = True
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    role: UserRole = UserRole.viewer
+
+
+class UserOut(UserBase):
+    id: uuid.UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
