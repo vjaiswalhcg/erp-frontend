@@ -67,15 +67,16 @@ def map_invoice_to_out(invoice: Invoice) -> dict[str, Any]:
         "deleted_at": invoice.deleted_at,
         "deleted_by_id": invoice.deleted_by_id,
     }
-    # Map user relationships
+    # Map user relationships (serialize to dict)
+    from app.schemas.user import UserInfo
     if invoice.created_by_user:
-        data["created_by"] = invoice.created_by_user
+        data["created_by"] = UserInfo.from_orm(invoice.created_by_user).dict()
     if invoice.last_modified_by_user:
-        data["last_modified_by"] = invoice.last_modified_by_user
+        data["last_modified_by"] = UserInfo.from_orm(invoice.last_modified_by_user).dict()
     if invoice.owner_user:
-        data["owner"] = invoice.owner_user
+        data["owner"] = UserInfo.from_orm(invoice.owner_user).dict()
     if invoice.deleted_by_user:
-        data["deleted_by"] = invoice.deleted_by_user
+        data["deleted_by"] = UserInfo.from_orm(invoice.deleted_by_user).dict()
     # Map customer if loaded
     if invoice.customer:
         data["customer"] = CustomerOut.from_orm(invoice.customer).dict()

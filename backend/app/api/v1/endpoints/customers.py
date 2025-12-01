@@ -35,15 +35,16 @@ def map_customer_to_out(customer: Customer) -> dict[str, Any]:
         "deleted_at": customer.deleted_at,
         "deleted_by_id": customer.deleted_by_id,
     }
-    # Map user relationships
+    # Map user relationships (serialize to dict)
+    from app.schemas.user import UserInfo
     if customer.created_by_user:
-        data["created_by"] = customer.created_by_user
+        data["created_by"] = UserInfo.from_orm(customer.created_by_user).dict()
     if customer.last_modified_by_user:
-        data["last_modified_by"] = customer.last_modified_by_user
+        data["last_modified_by"] = UserInfo.from_orm(customer.last_modified_by_user).dict()
     if customer.owner_user:
-        data["owner"] = customer.owner_user
+        data["owner"] = UserInfo.from_orm(customer.owner_user).dict()
     if customer.deleted_by_user:
-        data["deleted_by"] = customer.deleted_by_user
+        data["deleted_by"] = UserInfo.from_orm(customer.deleted_by_user).dict()
     return data
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])

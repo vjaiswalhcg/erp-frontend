@@ -34,15 +34,16 @@ def map_product_to_out(product: Product) -> dict[str, Any]:
         "deleted_at": product.deleted_at,
         "deleted_by_id": product.deleted_by_id,
     }
-    # Map user relationships
+    # Map user relationships (serialize to dict)
+    from app.schemas.user import UserInfo
     if product.created_by_user:
-        data["created_by"] = product.created_by_user
+        data["created_by"] = UserInfo.from_orm(product.created_by_user).dict()
     if product.last_modified_by_user:
-        data["last_modified_by"] = product.last_modified_by_user
+        data["last_modified_by"] = UserInfo.from_orm(product.last_modified_by_user).dict()
     if product.owner_user:
-        data["owner"] = product.owner_user
+        data["owner"] = UserInfo.from_orm(product.owner_user).dict()
     if product.deleted_by_user:
-        data["deleted_by"] = product.deleted_by_user
+        data["deleted_by"] = UserInfo.from_orm(product.deleted_by_user).dict()
     return data
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])

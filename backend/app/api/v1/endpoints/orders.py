@@ -62,15 +62,16 @@ def map_order_to_out(order: Order) -> dict[str, Any]:
         "deleted_at": order.deleted_at,
         "deleted_by_id": order.deleted_by_id,
     }
-    # Map user relationships
+    # Map user relationships (serialize to dict)
+    from app.schemas.user import UserInfo
     if order.created_by_user:
-        data["created_by"] = order.created_by_user
+        data["created_by"] = UserInfo.from_orm(order.created_by_user).dict()
     if order.last_modified_by_user:
-        data["last_modified_by"] = order.last_modified_by_user
+        data["last_modified_by"] = UserInfo.from_orm(order.last_modified_by_user).dict()
     if order.owner_user:
-        data["owner"] = order.owner_user
+        data["owner"] = UserInfo.from_orm(order.owner_user).dict()
     if order.deleted_by_user:
-        data["deleted_by"] = order.deleted_by_user
+        data["deleted_by"] = UserInfo.from_orm(order.deleted_by_user).dict()
     # Map customer if loaded
     if order.customer:
         data["customer"] = CustomerOut.from_orm(order.customer).dict()
