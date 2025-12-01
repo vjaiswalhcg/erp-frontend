@@ -5,12 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api import deps
+from app.api.deps import set_audit_fields_on_create, set_audit_fields_on_update, set_soft_delete_fields
 from app.core.config import settings
+from app.core.security import get_current_user
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceLine, InvoiceStatus
 from app.models.order import Order
 from app.models.product import Product
 from app.models.payment import PaymentApplication
+from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
@@ -21,25 +24,28 @@ async def list_invoices(
     db: AsyncSession = Depends(deps.get_session),
     limit: int = Query(default=settings.default_page_size, le=settings.max_page_size),
     offset: int = Query(default=0, ge=0),
+    include_deleted: bool = Query(default=False, description="Include soft-deleted records"),
 ):
-    query = (
-        select(Invoice)
-        .options(
-            selectinload(Invoice.lines),
-            selectinload(Invoice.customer),
-            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
-        )
-        .offset(offset)
-        .limit(limit)
+    """List all invoices. By default excludes soft-deleted records."""
+    query = select(Invoice).options(
+        selectinload(Invoice.lines),
+        selectinload(Invoice.customer),
+        selectinload(Invoice.lines).selectinload(InvoiceLine.product),
     )
+    if not include_deleted:
+        query = query.where(Invoice.is_deleted == False)
+    query = query.offset(offset).limit(limit)
     result = await db.execute(query)
     return result.scalars().unique().all()
 
 
 @router.post("/", response_model=InvoiceOut)
 async def create_invoice(
-    payload: InvoiceCreate, db: AsyncSession = Depends(deps.get_session)
+    payload: InvoiceCreate,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
 ):
+    """Create a new invoice with audit trail."""
     customer = await db.get(Customer, payload.customer_id)
     if not customer:
         raise HTTPException(status_code=400, detail="Invalid customer")
@@ -84,7 +90,7 @@ async def create_invoice(
         if isinstance(line, dict):
             normalized.append(line)
         else:
-            normalized.append(line.dict())
+            normalized.append(line.model_dump())
 
     for line in normalized:
         product_id = line.get("product_id")
@@ -124,6 +130,14 @@ async def create_invoice(
         total=subtotal + tax_total,
         lines=lines,
     )
+    
+    # Set audit fields
+    set_audit_fields_on_create(invoice, current_user)
+    
+    # Allow setting owner_id from payload if provided
+    if payload.owner_id:
+        invoice.owner_id = payload.owner_id
+    
     db.add(invoice)
     await db.commit()
     query = (
@@ -140,8 +154,12 @@ async def create_invoice(
 
 @router.put("/{invoice_id}", response_model=InvoiceOut)
 async def update_invoice(
-    invoice_id: str, payload: InvoiceUpdate, db: AsyncSession = Depends(deps.get_session)
+    invoice_id: str,
+    payload: InvoiceUpdate,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
 ):
+    """Update an invoice with audit trail."""
     result = await db.execute(
         select(Invoice)
         .options(
@@ -153,10 +171,16 @@ async def update_invoice(
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if invoice.is_deleted:
+        raise HTTPException(status_code=400, detail="Cannot update a deleted invoice")
 
-    customer = await db.get(Customer, payload.customer_id)
-    if not customer:
-        raise HTTPException(status_code=400, detail="Invalid customer")
+    # Only validate customer if provided
+    if payload.customer_id:
+        customer = await db.get(Customer, payload.customer_id)
+        if not customer:
+            raise HTTPException(status_code=400, detail="Invalid customer")
+        invoice.customer_id = payload.customer_id
 
     # If lines provided, rebuild
     if payload.lines is not None:
@@ -195,13 +219,25 @@ async def update_invoice(
         invoice.tax_total = float(payload.tax_total)
         invoice.total = invoice.subtotal + invoice.tax_total
 
-    invoice.customer_id = payload.customer_id
-    invoice.order_id = payload.order_id
-    invoice.currency = payload.currency
-    invoice.invoice_date = payload.invoice_date or invoice.invoice_date
-    invoice.due_date = payload.due_date
-    invoice.status = payload.status or invoice.status
-    invoice.notes = payload.notes
+    if payload.order_id is not None:
+        invoice.order_id = payload.order_id
+    if payload.currency is not None:
+        invoice.currency = payload.currency
+    if payload.invoice_date is not None:
+        invoice.invoice_date = payload.invoice_date
+    if payload.due_date is not None:
+        invoice.due_date = payload.due_date
+    if payload.status is not None:
+        invoice.status = payload.status
+    if payload.notes is not None:
+        invoice.notes = payload.notes
+    if payload.external_ref is not None:
+        invoice.external_ref = payload.external_ref
+    if payload.owner_id is not None:
+        invoice.owner_id = payload.owner_id
+
+    # Set audit fields
+    set_audit_fields_on_update(invoice, current_user)
 
     await db.commit()
     query = (
@@ -218,6 +254,7 @@ async def update_invoice(
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
 async def get_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_session)):
+    """Get an invoice by ID."""
     query = (
         select(Invoice)
         .options(
@@ -235,20 +272,29 @@ async def get_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_sessi
 
 
 @router.post("/{invoice_id}/post", response_model=InvoiceOut)
-async def post_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_session)):
-    return await _transition_invoice(invoice_id, InvoiceStatus.posted, db)
+async def post_invoice(
+    invoice_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Post an invoice."""
+    return await _transition_invoice(invoice_id, InvoiceStatus.posted, db, current_user)
 
 
 @router.post("/{invoice_id}/write-off", response_model=InvoiceOut)
 async def write_off_invoice(
-    invoice_id: str, db: AsyncSession = Depends(deps.get_session)
+    invoice_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
 ):
-    return await _transition_invoice(invoice_id, InvoiceStatus.written_off, db)
+    """Write off an invoice."""
+    return await _transition_invoice(invoice_id, InvoiceStatus.written_off, db, current_user)
 
 
 async def _transition_invoice(
-    invoice_id: str, next_status: InvoiceStatus, db: AsyncSession
+    invoice_id: str, next_status: InvoiceStatus, db: AsyncSession, current_user: User
 ) -> Invoice:
+    """Transition an invoice to a new status."""
     query = (
         select(Invoice)
         .options(
@@ -262,7 +308,13 @@ async def _transition_invoice(
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if invoice.is_deleted:
+        raise HTTPException(status_code=400, detail="Cannot modify a deleted invoice")
+    
     invoice.status = next_status
+    set_audit_fields_on_update(invoice, current_user)
+    
     await db.commit()
     await db.refresh(invoice, ["lines", "customer"])
     return invoice
@@ -270,8 +322,17 @@ async def _transition_invoice(
 
 @router.delete("/{invoice_id}", status_code=204)
 async def delete_invoice(
-    invoice_id: str, db: AsyncSession = Depends(deps.get_session)
+    invoice_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+    hard_delete: bool = Query(default=False, description="Permanently delete instead of soft delete"),
 ):
+    """
+    Delete an invoice.
+    
+    By default, performs a soft delete (sets is_deleted=True).
+    Use hard_delete=True to permanently remove the record.
+    """
     result = await db.execute(
         select(Invoice)
         .options(
@@ -283,11 +344,49 @@ async def delete_invoice(
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    # Delete payment applications that reference this invoice to avoid FK errors
-    await db.execute(
-        delete(PaymentApplication).where(PaymentApplication.invoice_id == invoice_id)
-    )
-    await db.delete(invoice)
+    
+    if hard_delete:
+        # Delete payment applications that reference this invoice to avoid FK errors
+        await db.execute(
+            delete(PaymentApplication).where(PaymentApplication.invoice_id == invoice_id)
+        )
+        await db.delete(invoice)
+    else:
+        set_soft_delete_fields(invoice, current_user)
+    
     await db.commit()
     return Response(status_code=204)
 
+
+@router.post("/{invoice_id}/restore", response_model=InvoiceOut)
+async def restore_invoice(
+    invoice_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted invoice."""
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.lines),
+            selectinload(Invoice.customer),
+            selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+        )
+        .where(Invoice.id == invoice_id)
+    )
+    result = await db.execute(query)
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if not invoice.is_deleted:
+        raise HTTPException(status_code=400, detail="Invoice is not deleted")
+    
+    invoice.is_deleted = False
+    invoice.deleted_at = None
+    invoice.deleted_by_id = None
+    set_audit_fields_on_update(invoice, current_user)
+    
+    await db.commit()
+    await db.refresh(invoice, ["lines", "customer"])
+    return invoice

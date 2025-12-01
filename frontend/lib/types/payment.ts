@@ -1,10 +1,13 @@
-export interface PaymentApplication {
+import { AuditFieldsCreate, AuditFieldsUpdate, EntityAuditFields, LineItemAuditFields } from "./common";
+
+export interface PaymentApplication extends LineItemAuditFields {
   id: string;
+  payment_id: string;
   invoice_id: string;
   amount_applied: number;
 }
 
-export interface Payment {
+export interface Payment extends EntityAuditFields {
   id: string;
   external_ref: string | null;
   customer_id: string;
@@ -22,7 +25,7 @@ export interface Payment {
   };
 }
 
-export interface PaymentCreate {
+export interface PaymentCreate extends AuditFieldsCreate {
   external_ref?: string;
   customer_id: string;
   invoice_id?: string;
@@ -33,7 +36,7 @@ export interface PaymentCreate {
   note?: string;
 }
 
-export interface PaymentUpdate {
+export interface PaymentUpdate extends AuditFieldsUpdate {
   external_ref?: string;
   customer_id?: string;
   invoice_id?: string | null;
@@ -43,4 +46,9 @@ export interface PaymentUpdate {
   method?: string;
   note?: string;
   status?: "received" | "applied" | "failed";
+}
+
+export interface PaymentApplicationCreate {
+  invoice_id: string;
+  amount_applied: number;
 }

@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, validator
 from app.models.invoice import InvoiceStatus
 from app.schemas.customer import CustomerOut
 from app.schemas.product import ProductOut
-from app.schemas.customer import CustomerOut
-from app.schemas.product import ProductOut
 
 
 class InvoiceLineCreate(BaseModel):
@@ -21,9 +19,11 @@ class InvoiceLineOut(InvoiceLineCreate):
     id: uuid.UUID
     line_total: float
     product: ProductOut | None = None
+    # Line item audit
+    created_at: datetime | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class InvoiceBase(BaseModel):
@@ -59,10 +59,42 @@ class InvoiceBase(BaseModel):
 
 class InvoiceCreate(InvoiceBase):
     lines: list[InvoiceLineCreate] | None = None
+    # Optional: allow specifying owner on create (defaults to creator)
+    owner_id: uuid.UUID | None = None
 
 
-class InvoiceUpdate(InvoiceBase):
+class InvoiceUpdate(BaseModel):
+    """All fields optional for partial updates"""
+    external_ref: str | None = None
+    order_id: uuid.UUID | None = None
+    customer_id: uuid.UUID | None = None
+    currency: str | None = None
+    status: InvoiceStatus | None = None
+    due_date: datetime | None = None
+    invoice_date: datetime | date | str | None = None
+    notes: str | None = None
+    tax_total: float | None = None
     lines: list[InvoiceLineCreate] | None = None
+    owner_id: uuid.UUID | None = None  # Allow transferring ownership
+
+    @validator("invoice_date", "due_date", pre=True)
+    def _coerce_dates(cls, v):
+        if v in (None, ""):
+            return None
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, date):
+            return datetime.combine(v, datetime.min.time())
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                try:
+                    d = date.fromisoformat(v)
+                    return datetime.combine(d, datetime.min.time())
+                except ValueError:
+                    raise ValueError("Invalid date format")
+        return v
 
 
 class InvoiceOut(InvoiceBase):
@@ -74,11 +106,20 @@ class InvoiceOut(InvoiceBase):
     total: float
     lines: list[InvoiceLineOut] = []
     customer: CustomerOut | None = None
+    # Audit fields
+    created_at: datetime
+    updated_at: datetime
+    created_by_id: uuid.UUID | None = None
+    last_modified_by_id: uuid.UUID | None = None
+    owner_id: uuid.UUID | None = None
+    # Soft delete fields
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
+    deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class InvoiceStatusUpdate(BaseModel):
     status: InvoiceStatus
-

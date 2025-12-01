@@ -7,13 +7,17 @@ from sqlalchemy.orm import selectinload
 from starlette.responses import Response
 
 from app.api import deps
+from app.api.deps import set_audit_fields_on_create, set_audit_fields_on_update, set_soft_delete_fields
 from app.core.config import settings
+from app.core.security import get_current_user
 from app.models.customer import Customer
 from app.models.order import Order, OrderLine, OrderStatus
 from app.models.product import Product
+from app.models.user import User
 from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderUpdateStatus
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
+
 
 def _normalize_order_date(value: datetime | str | None) -> datetime:
     if value is None:
@@ -40,25 +44,28 @@ async def list_orders(
     db: AsyncSession = Depends(deps.get_session),
     limit: int = Query(default=settings.default_page_size, le=settings.max_page_size),
     offset: int = Query(default=0, ge=0),
+    include_deleted: bool = Query(default=False, description="Include soft-deleted records"),
 ):
-    query = (
-        select(Order)
-        .options(
-            selectinload(Order.lines),
-            selectinload(Order.customer),
-            selectinload(Order.lines).selectinload(OrderLine.product),
-        )
-        .offset(offset)
-        .limit(limit)
+    """List all orders. By default excludes soft-deleted records."""
+    query = select(Order).options(
+        selectinload(Order.lines),
+        selectinload(Order.customer),
+        selectinload(Order.lines).selectinload(OrderLine.product),
     )
+    if not include_deleted:
+        query = query.where(Order.is_deleted == False)
+    query = query.offset(offset).limit(limit)
     result = await db.execute(query)
     return result.scalars().unique().all()
 
 
 @router.post("/", response_model=OrderOut)
 async def create_order(
-    payload: OrderCreate, db: AsyncSession = Depends(deps.get_session)
+    payload: OrderCreate,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
 ):
+    """Create a new order with audit trail."""
     customer = await db.get(Customer, payload.customer_id)
     if not customer:
         raise HTTPException(status_code=400, detail="Invalid customer")
@@ -99,6 +106,14 @@ async def create_order(
         notes=payload.notes,
         lines=lines,
     )
+    
+    # Set audit fields
+    set_audit_fields_on_create(order, current_user)
+    
+    # Allow setting owner_id from payload if provided
+    if payload.owner_id:
+        order.owner_id = payload.owner_id
+    
     db.add(order)
     await db.commit()
     query = (
@@ -114,19 +129,39 @@ async def create_order(
 
 
 @router.delete("/{order_id}", status_code=204)
-async def delete_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
+async def delete_order(
+    order_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+    hard_delete: bool = Query(default=False, description="Permanently delete instead of soft delete"),
+):
+    """
+    Delete an order.
+    
+    By default, performs a soft delete (sets is_deleted=True).
+    Use hard_delete=True to permanently remove the record.
+    """
     order = await db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    await db.delete(order)
+    
+    if hard_delete:
+        await db.delete(order)
+    else:
+        set_soft_delete_fields(order, current_user)
+    
     await db.commit()
     return Response(status_code=204)
 
 
 @router.put("/{order_id}", response_model=OrderOut)
 async def update_order(
-    order_id: str, payload: OrderUpdate, db: AsyncSession = Depends(deps.get_session)
+    order_id: str,
+    payload: OrderUpdate,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
 ):
+    """Update an order with audit trail."""
     result = await db.execute(
         select(Order)
         .options(
@@ -139,10 +174,16 @@ async def update_order(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    
+    if order.is_deleted:
+        raise HTTPException(status_code=400, detail="Cannot update a deleted order")
 
-    customer = await db.get(Customer, payload.customer_id)
-    if not customer:
-        raise HTTPException(status_code=400, detail="Invalid customer")
+    # Only validate customer if it's being changed
+    if payload.customer_id:
+        customer = await db.get(Customer, payload.customer_id)
+        if not customer:
+            raise HTTPException(status_code=400, detail="Invalid customer")
+        order.customer_id = payload.customer_id
 
     if payload.lines is not None:
         new_lines: list[OrderLine] = []
@@ -172,12 +213,21 @@ async def update_order(
         order.tax_total = tax_total
         order.total = subtotal + tax_total
 
-    order.external_ref = payload.external_ref
-    order.customer_id = payload.customer_id
-    order.order_date = _normalize_order_date(payload.order_date) or order.order_date
-    order.status = payload.status
-    order.currency = payload.currency
-    order.notes = payload.notes
+    if payload.external_ref is not None:
+        order.external_ref = payload.external_ref
+    if payload.order_date is not None:
+        order.order_date = _normalize_order_date(payload.order_date)
+    if payload.status is not None:
+        order.status = payload.status
+    if payload.currency is not None:
+        order.currency = payload.currency
+    if payload.notes is not None:
+        order.notes = payload.notes
+    if payload.owner_id is not None:
+        order.owner_id = payload.owner_id
+
+    # Set audit fields
+    set_audit_fields_on_update(order, current_user)
 
     await db.commit()
     await db.refresh(order, ["lines", "customer"])
@@ -186,6 +236,7 @@ async def update_order(
 
 @router.get("/{order_id}", response_model=OrderOut)
 async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
+    """Get an order by ID."""
     query = (
         select(Order)
         .options(
@@ -203,18 +254,32 @@ async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session))
 
 
 @router.post("/{order_id}/confirm", response_model=OrderOut)
-async def confirm_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
-    return await _transition_order(order_id, OrderStatus.confirmed, db)
+async def confirm_order(
+    order_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Confirm an order."""
+    return await _transition_order(order_id, OrderStatus.confirmed, db, current_user)
 
 
 @router.post("/{order_id}/fulfill", response_model=OrderOut)
-async def fulfill_order(order_id: str, db: AsyncSession = Depends(deps.get_session)):
-    return await _transition_order(order_id, OrderStatus.fulfilled, db)
+async def fulfill_order(
+    order_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Fulfill an order."""
+    return await _transition_order(order_id, OrderStatus.fulfilled, db, current_user)
 
 
-async def _transition_order(
-    order_id: str, next_status: OrderStatus, db: AsyncSession
-) -> Order:
+@router.post("/{order_id}/restore", response_model=OrderOut)
+async def restore_order(
+    order_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore a soft-deleted order."""
     query = (
         select(Order)
         .options(
@@ -228,9 +293,45 @@ async def _transition_order(
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    
+    if not order.is_deleted:
+        raise HTTPException(status_code=400, detail="Order is not deleted")
+    
+    order.is_deleted = False
+    order.deleted_at = None
+    order.deleted_by_id = None
+    set_audit_fields_on_update(order, current_user)
+    
+    await db.commit()
+    await db.refresh(order, ["lines", "customer"])
+    return order
+
+
+async def _transition_order(
+    order_id: str, next_status: OrderStatus, db: AsyncSession, current_user: User
+) -> Order:
+    """Transition an order to a new status."""
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.lines),
+            selectinload(Order.customer),
+            selectinload(Order.lines).selectinload(OrderLine.product),
+        )
+        .where(Order.id == order_id)
+    )
+    result = await db.execute(query)
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.is_deleted:
+        raise HTTPException(status_code=400, detail="Cannot modify a deleted order")
     if order.status == OrderStatus.closed:
         raise HTTPException(status_code=400, detail="Order already closed")
+    
     order.status = next_status
+    set_audit_fields_on_update(order, current_user)
+    
     await db.commit()
     await db.refresh(order, ["lines", "customer"])
     return order

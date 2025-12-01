@@ -1,4 +1,6 @@
-export interface InvoiceLine {
+import { AuditFieldsCreate, AuditFieldsUpdate, EntityAuditFields, LineItemAuditFields } from "./common";
+
+export interface InvoiceLine extends LineItemAuditFields {
   id: string;
   description: string | null;
   product_id?: string | null;
@@ -9,10 +11,11 @@ export interface InvoiceLine {
   product?: {
     id: string;
     name: string;
+    sku?: string;
   };
 }
 
-export interface Invoice {
+export interface Invoice extends EntityAuditFields {
   id: string;
   external_ref: string | null;
   customer_id: string;
@@ -32,7 +35,15 @@ export interface Invoice {
   };
 }
 
-export interface InvoiceCreate {
+export interface InvoiceLineCreate {
+  description?: string;
+  product_id?: string | null;
+  quantity: number;
+  unit_price: number;
+  tax_rate?: number;
+}
+
+export interface InvoiceCreate extends AuditFieldsCreate {
   external_ref?: string;
   customer_id: string;
   order_id?: string;
@@ -42,29 +53,18 @@ export interface InvoiceCreate {
   tax_total?: number;
   currency?: string;
   notes?: string;
-  lines: {
-    description?: string;
-    product_id?: string | null;
-    quantity: number;
-    unit_price: number;
-    tax_rate?: number;
-  }[];
+  lines?: InvoiceLineCreate[];
 }
 
-export interface InvoiceUpdate {
+export interface InvoiceUpdate extends AuditFieldsUpdate {
   external_ref?: string;
   customer_id?: string;
   order_id?: string | null;
   invoice_date?: string;
   due_date?: string;
   status?: "draft" | "posted" | "paid" | "written_off";
+  tax_total?: number;
   notes?: string;
   currency?: string;
-  lines?: {
-    description?: string;
-    product_id?: string | null;
-    quantity: number;
-    unit_price: number;
-    tax_rate?: number;
-  }[];
+  lines?: InvoiceLineCreate[];
 }

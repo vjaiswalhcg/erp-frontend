@@ -35,10 +35,18 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     id: uuid.UUID
+    # Audit fields
     created_at: datetime
+    updated_at: datetime
+    created_by_id: uuid.UUID | None = None
+    last_modified_by_id: uuid.UUID | None = None
+    # Soft delete fields
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
+    deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserLogin(BaseModel):

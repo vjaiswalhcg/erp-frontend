@@ -1,4 +1,6 @@
-export interface Customer {
+import { AuditFieldsCreate, AuditFieldsUpdate, EntityAuditFields } from "./common";
+
+export interface Customer extends EntityAuditFields {
   id: string;
   external_ref: string | null;
   name: string;
@@ -10,7 +12,7 @@ export interface Customer {
   is_active: boolean;
 }
 
-export interface CustomerCreate {
+export interface CustomerCreate extends AuditFieldsCreate {
   external_ref?: string;
   name: string;
   email?: string;
@@ -18,6 +20,16 @@ export interface CustomerCreate {
   billing_address?: string;
   shipping_address?: string;
   currency?: string;
+  is_active?: boolean;
 }
 
-export type CustomerUpdate = Partial<CustomerCreate>;
+export interface CustomerUpdate extends AuditFieldsUpdate {
+  external_ref?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  billing_address?: string;
+  shipping_address?: string;
+  currency?: string;
+  is_active?: boolean;
+}
