@@ -8,6 +8,7 @@ export interface Product extends EntityAuditFields {
   description: string | null;
   uom: string | null;
   price: number;
+  currency: string;
   tax_code: string | null;
   is_active: boolean;
 }
