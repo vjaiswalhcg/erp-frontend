@@ -22,7 +22,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  Search,
+  Filter,
+  ShoppingCart,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Clock,
+  CheckCircle,
+} from "lucide-react";
 import { OrderDialog } from "./OrderDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -122,140 +134,224 @@ export function OrderTable() {
     };
   }, [orders, search, statusFilter, sortDir, sortField, page]);
 
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = orders?.length || 0;
+    const draft = orders?.filter((o) => o.status === "draft").length || 0;
+    const confirmed =
+      orders?.filter((o) => o.status === "confirmed").length || 0;
+    const fulfilled =
+      orders?.filter((o) => o.status === "fulfilled").length || 0;
+    const totalValue =
+      orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+    return { total, draft, confirmed, fulfilled, totalValue };
+  }, [orders]);
+
   if (isLoading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
+        <p className="text-muted-foreground">Loading orders...</p>
+      </div>
+    );
   }
 
-  const toggleSort = (field: typeof sortField) => {
-    if (sortField === field) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDir(field === "order_date" ? "desc" : "asc");
-    }
-  };
-
   const getStatusBadge = (status: string) => {
-    const variants: Record<
-      string,
-      "default" | "secondary" | "destructive" | "outline"
-    > = {
-      draft: "secondary",
-      confirmed: "default",
-      fulfilled: "outline",
-      cancelled: "destructive",
+    const styles: Record<string, string> = {
+      draft:
+        "bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400",
+      confirmed:
+        "bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/50 dark:text-blue-400",
+      fulfilled:
+        "bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-400",
+      cancelled:
+        "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/50 dark:text-red-400",
     };
-    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
+    return (
+      <Badge variant="secondary" className={styles[status] || styles.draft}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Orders</h2>
-          <p className="text-sm text-muted-foreground">
-            Track, filter, and manage recent orders.
-          </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/25">
+            <ShoppingCart className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
+            <p className="text-sm text-muted-foreground">
+              Track and manage sales orders • {stats.total} orders
+            </p>
+          </div>
         </div>
         {canCreate && (
-          <Button onClick={handleCreate}>
+          <Button
+            onClick={handleCreate}
+            className="bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-500/25"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Create Order
           </Button>
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <Input
-          placeholder="Search by customer, ref, or ID"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <Select
-          value={statusFilter}
-          onValueChange={(value) => {
-            setStatusFilter(value);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="fulfilled">Fulfilled</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={`${sortField}:${sortDir}`}
-          onValueChange={(value) => {
-            const [field, dir] = value.split(":") as [
-              typeof sortField,
-              typeof sortDir
-            ];
-            setSortField(field);
-            setSortDir(dir);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="order_date:desc">Newest first</SelectItem>
-            <SelectItem value="order_date:asc">Oldest first</SelectItem>
-            <SelectItem value="total:desc">Total high -&gt; low</SelectItem>
-            <SelectItem value="total:asc">Total low -&gt; high</SelectItem>
-            <SelectItem value="status:asc">Status A -&gt; Z</SelectItem>
-            <SelectItem value="status:desc">Status Z -&gt; A</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              Total Orders
+            </span>
+            <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+              <ShoppingCart className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold mt-2">{stats.total}</p>
+        </div>
+        <div className="bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-900/50 dark:to-gray-900/30 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              Draft
+            </span>
+            <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+              <Clock className="h-4 w-4 text-slate-500" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold mt-2 text-slate-600 dark:text-slate-400">
+            {stats.draft}
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+              Confirmed
+            </span>
+            <div className="h-8 w-8 rounded-lg bg-blue-200 dark:bg-blue-800 flex items-center justify-center">
+              <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+            </div>
+          </div>
+          <p className="text-2xl font-bold mt-2 text-blue-700 dark:text-blue-400">
+            {stats.confirmed}
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-emerald-50 to-green-100 dark:from-emerald-900/30 dark:to-green-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              Fulfilled
+            </span>
+            <div className="h-8 w-8 rounded-lg bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center">
+              <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold mt-2 text-emerald-700 dark:text-emerald-400">
+            {stats.fulfilled}
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/20 rounded-xl border border-orange-200 dark:border-orange-800 p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+              Total Value
+            </span>
+            <div className="h-8 w-8 rounded-lg bg-orange-200 dark:bg-orange-800 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold mt-2 text-orange-700 dark:text-orange-400">
+            {formatCurrency(stats.totalValue, "USD")}
+          </p>
+        </div>
       </div>
 
-      <div className="rounded-md border shadow-sm">
+      {/* Search & Filter Section */}
+      <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Search & Filter
+          </span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by customer, ref, or ID..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-10 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+            />
+          </div>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="fulfilled">Fulfilled</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={`${sortField}:${sortDir}`}
+            onValueChange={(value) => {
+              const [field, dir] = value.split(":") as [
+                typeof sortField,
+                typeof sortDir
+              ];
+              setSortField(field);
+              setSortDir(dir);
+            }}
+          >
+            <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="order_date:desc">Newest First</SelectItem>
+              <SelectItem value="order_date:asc">Oldest First</SelectItem>
+              <SelectItem value="total:desc">Total High → Low</SelectItem>
+              <SelectItem value="total:asc">Total Low → High</SelectItem>
+              <SelectItem value="status:asc">Status A → Z</SelectItem>
+              <SelectItem value="status:desc">Status Z → A</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("order_date")}
-              >
-                Order Date{" "}
-                {sortField === "order_date"
-                  ? sortDir === "asc"
-                    ? "(asc)"
-                    : "(desc)"
-                  : ""}
+            <TableRow className="bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800/80">
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-200">
+                Order Date
               </TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("status")}
-              >
-                Status{" "}
-                {sortField === "status"
-                  ? sortDir === "asc"
-                    ? "(asc)"
-                    : "(desc)"
-                  : ""}
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-200">
+                Customer
               </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("total")}
-              >
-                Total{" "}
-                {sortField === "total"
-                  ? sortDir === "asc"
-                    ? "(asc)"
-                    : "(desc)"
-                  : ""}
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-200">
+                Status
               </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-200">
+                Total
+              </TableHead>
+              <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-200">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -263,45 +359,81 @@ export function OrderTable() {
               <TableRow>
                 <TableCell
                   colSpan={5}
-                  className="text-center text-muted-foreground"
+                  className="h-32 text-center text-muted-foreground"
                 >
-                  No orders match your filters.
+                  <div className="flex flex-col items-center gap-2">
+                    <ShoppingCart className="h-8 w-8 text-slate-300" />
+                    <p>No orders match your filters.</p>
+                    {search && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => {
+                          setSearch("");
+                          setStatusFilter("all");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              processedOrders.rows.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell>{formatDate(order.order_date)}</TableCell>
+              processedOrders.rows.map((order, index) => (
+                <TableRow
+                  key={order.id}
+                  className={`
+                    transition-colors
+                    ${
+                      index % 2 === 0
+                        ? "bg-white dark:bg-slate-900"
+                        : "bg-slate-50/50 dark:bg-slate-800/30"
+                    }
+                    hover:bg-orange-50 dark:hover:bg-orange-900/20
+                  `}
+                >
+                  <TableCell className="text-slate-600 dark:text-slate-400">
+                    {formatDate(order.order_date)}
+                  </TableCell>
                   <TableCell className="font-medium">
-                    {order.customer?.name || "Unnamed customer"}
-                    <div className="text-xs text-muted-foreground">
-                      {order.external_ref || order.customer_id}
+                    <div>
+                      {order.customer?.name || "Unnamed customer"}
+                      <div className="text-xs text-muted-foreground">
+                        {order.external_ref || order.customer_id}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
                   <TableCell>
-                    {formatCurrency(Number(order.total), order.currency)}
+                    <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      {formatCurrency(Number(order.total), order.currency)}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    {canEdit && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(order)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(order.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(order)}
+                          className="h-8 w-8 hover:bg-orange-100 hover:text-orange-600 dark:hover:bg-orange-900/30"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(order.id)}
+                          disabled={deleteMutation.isPending}
+                          className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -310,24 +442,78 @@ export function OrderTable() {
         </Table>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <div>
-          Showing {(processedOrders.currentPage - 1) * pageSize + 1}-
-          {Math.min(
-            processedOrders.currentPage * pageSize,
-            processedOrders.total
-          )}{" "}
-          of {processedOrders.total}
+      {/* Pagination */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="text-sm text-slate-600 dark:text-slate-400">
+          Showing{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {processedOrders.total === 0
+              ? 0
+              : (processedOrders.currentPage - 1) * pageSize + 1}
+          </span>{" "}
+          to{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {Math.min(
+              processedOrders.currentPage * pageSize,
+              processedOrders.total
+            )}
+          </span>{" "}
+          of{" "}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {processedOrders.total}
+          </span>{" "}
+          orders
         </div>
-        <div className="space-x-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             disabled={processedOrders.currentPage === 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="h-9 gap-1"
           >
+            <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
+          <div className="flex items-center gap-1">
+            {Array.from(
+              { length: Math.min(5, processedOrders.totalPages) },
+              (_, i) => {
+                let pageNum: number;
+                if (processedOrders.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (processedOrders.currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (
+                  processedOrders.currentPage >=
+                  processedOrders.totalPages - 2
+                ) {
+                  pageNum = processedOrders.totalPages - 4 + i;
+                } else {
+                  pageNum = processedOrders.currentPage - 2 + i;
+                }
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={
+                      pageNum === processedOrders.currentPage
+                        ? "default"
+                        : "outline"
+                    }
+                    size="sm"
+                    onClick={() => setPage(pageNum)}
+                    className={`h-9 w-9 p-0 ${
+                      pageNum === processedOrders.currentPage
+                        ? "bg-orange-600 hover:bg-orange-700"
+                        : ""
+                    }`}
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              }
+            )}
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -335,8 +521,10 @@ export function OrderTable() {
             onClick={() =>
               setPage((p) => Math.min(processedOrders.totalPages, p + 1))
             }
+            className="h-9 gap-1"
           >
             Next
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
