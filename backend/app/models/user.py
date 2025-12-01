@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Boolean, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, declared_attr
+from sqlalchemy.orm import Mapped, mapped_column, declared_attr, relationship
 import enum
 
 from app.models.base_class import Base
