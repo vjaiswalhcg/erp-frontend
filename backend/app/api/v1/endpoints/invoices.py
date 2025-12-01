@@ -213,11 +213,16 @@ async def create_invoice(
         .options(
             selectinload(Invoice.lines).selectinload(InvoiceLine.product),
             selectinload(Invoice.customer),
+            selectinload(Invoice.created_by_user),
+            selectinload(Invoice.last_modified_by_user),
+            selectinload(Invoice.owner_user),
+            selectinload(Invoice.deleted_by_user),
         )
         .where(Invoice.id == invoice.id)
     )
     result = await db.execute(query)
-    return result.scalar_one()
+    invoice = result.scalar_one()
+    return InvoiceOut(**map_invoice_to_out(invoice))
 
 
 @router.put("/{invoice_id}", response_model=InvoiceOut)
@@ -233,6 +238,10 @@ async def update_invoice(
         .options(
             selectinload(Invoice.lines).selectinload(InvoiceLine.product),
             selectinload(Invoice.customer),
+            selectinload(Invoice.created_by_user),
+            selectinload(Invoice.last_modified_by_user),
+            selectinload(Invoice.owner_user),
+            selectinload(Invoice.deleted_by_user),
         )
         .where(Invoice.id == invoice_id)
     )
@@ -329,6 +338,10 @@ async def get_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_sessi
             selectinload(Invoice.lines),
             selectinload(Invoice.customer),
             selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.created_by_user),
+            selectinload(Invoice.last_modified_by_user),
+            selectinload(Invoice.owner_user),
+            selectinload(Invoice.deleted_by_user),
         )
         .where(Invoice.id == invoice_id)
     )
@@ -336,7 +349,7 @@ async def get_invoice(invoice_id: str, db: AsyncSession = Depends(deps.get_sessi
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    return invoice
+    return InvoiceOut(**map_invoice_to_out(invoice))
 
 
 @router.post("/{invoice_id}/post", response_model=InvoiceOut)
@@ -361,7 +374,7 @@ async def write_off_invoice(
 
 async def _transition_invoice(
     invoice_id: str, next_status: InvoiceStatus, db: AsyncSession, current_user: User
-) -> Invoice:
+) -> InvoiceOut:
     """Transition an invoice to a new status."""
     query = (
         select(Invoice)
@@ -369,6 +382,10 @@ async def _transition_invoice(
             selectinload(Invoice.lines),
             selectinload(Invoice.customer),
             selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.created_by_user),
+            selectinload(Invoice.last_modified_by_user),
+            selectinload(Invoice.owner_user),
+            selectinload(Invoice.deleted_by_user),
         )
         .where(Invoice.id == invoice_id)
     )
@@ -384,8 +401,8 @@ async def _transition_invoice(
     set_audit_fields_on_update(invoice, current_user)
     
     await db.commit()
-    await db.refresh(invoice, ["lines", "customer"])
-    return invoice
+    await db.refresh(invoice, ["lines", "customer", "created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return InvoiceOut(**map_invoice_to_out(invoice))
 
 
 @router.delete("/{invoice_id}", status_code=204)
@@ -439,6 +456,10 @@ async def restore_invoice(
             selectinload(Invoice.lines),
             selectinload(Invoice.customer),
             selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+            selectinload(Invoice.created_by_user),
+            selectinload(Invoice.last_modified_by_user),
+            selectinload(Invoice.owner_user),
+            selectinload(Invoice.deleted_by_user),
         )
         .where(Invoice.id == invoice_id)
     )
@@ -456,5 +477,5 @@ async def restore_invoice(
     set_audit_fields_on_update(invoice, current_user)
     
     await db.commit()
-    await db.refresh(invoice, ["lines", "customer"])
-    return invoice
+    await db.refresh(invoice, ["lines", "customer", "created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return InvoiceOut(**map_invoice_to_out(invoice))
