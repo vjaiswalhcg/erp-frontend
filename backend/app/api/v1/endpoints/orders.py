@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -15,6 +16,65 @@ from app.models.order import Order, OrderLine, OrderStatus
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.order import OrderCreate, OrderOut, OrderUpdate, OrderUpdateStatus
+
+
+def map_order_to_out(order: Order) -> dict[str, Any]:
+    """Map order model to output dict with user relationships"""
+    from app.schemas.order import OrderLineOut
+    from app.schemas.customer import CustomerOut
+    
+    # Build lines
+    lines_data = []
+    if order.lines:
+        for line in order.lines:
+            line_dict = {
+                "id": line.id,
+                "product_id": line.product_id,
+                "quantity": float(line.quantity),
+                "unit_price": float(line.unit_price),
+                "tax_rate": float(line.tax_rate),
+                "line_total": float(line.line_total),
+                "created_at": line.created_at,
+            }
+            if line.product:
+                from app.schemas.product import ProductOut
+                line_dict["product"] = ProductOut.from_orm(line.product).dict()
+            lines_data.append(line_dict)
+    
+    data = {
+        "id": order.id,
+        "external_ref": order.external_ref,
+        "customer_id": order.customer_id,
+        "order_date": order.order_date,
+        "status": order.status,
+        "currency": order.currency,
+        "subtotal": float(order.subtotal),
+        "tax_total": float(order.tax_total),
+        "total": float(order.total),
+        "notes": order.notes,
+        "lines": lines_data,
+        "created_at": order.created_at,
+        "updated_at": order.updated_at,
+        "created_by_id": order.created_by_id,
+        "last_modified_by_id": order.last_modified_by_id,
+        "owner_id": order.owner_id,
+        "is_deleted": order.is_deleted,
+        "deleted_at": order.deleted_at,
+        "deleted_by_id": order.deleted_by_id,
+    }
+    # Map user relationships
+    if order.created_by_user:
+        data["created_by"] = order.created_by_user
+    if order.last_modified_by_user:
+        data["last_modified_by"] = order.last_modified_by_user
+    if order.owner_user:
+        data["owner"] = order.owner_user
+    if order.deleted_by_user:
+        data["deleted_by"] = order.deleted_by_user
+    # Map customer if loaded
+    if order.customer:
+        data["customer"] = CustomerOut.from_orm(order.customer).dict()
+    return data
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
@@ -51,12 +111,17 @@ async def list_orders(
         selectinload(Order.lines),
         selectinload(Order.customer),
         selectinload(Order.lines).selectinload(OrderLine.product),
+        selectinload(Order.created_by_user),
+        selectinload(Order.last_modified_by_user),
+        selectinload(Order.owner_user),
+        selectinload(Order.deleted_by_user),
     )
     if not include_deleted:
         query = query.where(Order.is_deleted == False)
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
-    return result.scalars().unique().all()
+    orders = result.scalars().unique().all()
+    return [OrderOut(**map_order_to_out(order)) for order in orders]
 
 
 @router.post("/", response_model=OrderOut)
@@ -121,11 +186,16 @@ async def create_order(
         .options(
             selectinload(Order.lines).selectinload(OrderLine.product),
             selectinload(Order.customer),
+            selectinload(Order.created_by_user),
+            selectinload(Order.last_modified_by_user),
+            selectinload(Order.owner_user),
+            selectinload(Order.deleted_by_user),
         )
         .where(Order.id == order.id)
     )
     result = await db.execute(query)
-    return result.scalar_one()
+    order = result.scalar_one()
+    return OrderOut(**map_order_to_out(order))
 
 
 @router.delete("/{order_id}", status_code=204)
@@ -168,6 +238,10 @@ async def update_order(
             selectinload(Order.lines),
             selectinload(Order.customer),
             selectinload(Order.lines).selectinload(OrderLine.product),
+            selectinload(Order.created_by_user),
+            selectinload(Order.last_modified_by_user),
+            selectinload(Order.owner_user),
+            selectinload(Order.deleted_by_user),
         )
         .where(Order.id == order_id)
     )
@@ -230,8 +304,8 @@ async def update_order(
     set_audit_fields_on_update(order, current_user)
 
     await db.commit()
-    await db.refresh(order, ["lines", "customer"])
-    return order
+    await db.refresh(order, ["lines", "customer", "created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return OrderOut(**map_order_to_out(order))
 
 
 @router.get("/{order_id}", response_model=OrderOut)
@@ -243,6 +317,10 @@ async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session))
             selectinload(Order.lines),
             selectinload(Order.customer),
             selectinload(Order.lines).selectinload(OrderLine.product),
+            selectinload(Order.created_by_user),
+            selectinload(Order.last_modified_by_user),
+            selectinload(Order.owner_user),
+            selectinload(Order.deleted_by_user),
         )
         .where(Order.id == order_id)
     )
@@ -250,7 +328,7 @@ async def get_order(order_id: str, db: AsyncSession = Depends(deps.get_session))
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    return order
+    return OrderOut(**map_order_to_out(order))
 
 
 @router.post("/{order_id}/confirm", response_model=OrderOut)
@@ -286,6 +364,10 @@ async def restore_order(
             selectinload(Order.lines),
             selectinload(Order.customer),
             selectinload(Order.lines).selectinload(OrderLine.product),
+            selectinload(Order.created_by_user),
+            selectinload(Order.last_modified_by_user),
+            selectinload(Order.owner_user),
+            selectinload(Order.deleted_by_user),
         )
         .where(Order.id == order_id)
     )
@@ -303,13 +385,13 @@ async def restore_order(
     set_audit_fields_on_update(order, current_user)
     
     await db.commit()
-    await db.refresh(order, ["lines", "customer"])
-    return order
+    await db.refresh(order, ["lines", "customer", "created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return OrderOut(**map_order_to_out(order))
 
 
 async def _transition_order(
     order_id: str, next_status: OrderStatus, db: AsyncSession, current_user: User
-) -> Order:
+) -> OrderOut:
     """Transition an order to a new status."""
     query = (
         select(Order)
@@ -317,6 +399,10 @@ async def _transition_order(
             selectinload(Order.lines),
             selectinload(Order.customer),
             selectinload(Order.lines).selectinload(OrderLine.product),
+            selectinload(Order.created_by_user),
+            selectinload(Order.last_modified_by_user),
+            selectinload(Order.owner_user),
+            selectinload(Order.deleted_by_user),
         )
         .where(Order.id == order_id)
     )
@@ -333,5 +419,5 @@ async def _transition_order(
     set_audit_fields_on_update(order, current_user)
     
     await db.commit()
-    await db.refresh(order, ["lines", "customer"])
-    return order
+    await db.refresh(order, ["lines", "customer", "created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return OrderOut(**map_order_to_out(order))

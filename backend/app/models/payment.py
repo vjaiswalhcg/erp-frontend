@@ -52,6 +52,12 @@ class Payment(Base, AuditMixin, SoftDeleteMixin):
     applications = relationship(
         "PaymentApplication", back_populates="payment", cascade="all, delete-orphan"
     )
+    
+    # User relationships for audit fields
+    created_by_user = relationship("User", foreign_keys="Payment.created_by_id", remote_side="User.id")
+    last_modified_by_user = relationship("User", foreign_keys="Payment.last_modified_by_id", remote_side="User.id")
+    owner_user = relationship("User", foreign_keys="Payment.owner_id", remote_side="User.id")
+    deleted_by_user = relationship("User", foreign_keys="Payment.deleted_by_id", remote_side="User.id")
 
 
 class PaymentApplication(Base, LineItemAuditMixin):

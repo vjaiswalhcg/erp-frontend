@@ -52,6 +52,12 @@ class Order(Base, AuditMixin, SoftDeleteMixin):
         "OrderLine", back_populates="order", cascade="all, delete-orphan"
     )
     invoice = relationship("Invoice", back_populates="order", uselist=False)
+    
+    # User relationships for audit fields
+    created_by_user = relationship("User", foreign_keys="Order.created_by_id", remote_side="User.id")
+    last_modified_by_user = relationship("User", foreign_keys="Order.last_modified_by_id", remote_side="User.id")
+    owner_user = relationship("User", foreign_keys="Order.owner_id", remote_side="User.id")
+    deleted_by_user = relationship("User", foreign_keys="Order.deleted_by_id", remote_side="User.id")
 
 
 class OrderLine(Base, LineItemAuditMixin):

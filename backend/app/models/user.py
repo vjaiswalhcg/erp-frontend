@@ -65,3 +65,8 @@ class User(Base):
         ForeignKey("user.id", ondelete="SET NULL"), 
         nullable=True
     )
+    
+    # User relationships for audit fields (self-referential)
+    created_by_user = relationship("User", foreign_keys="User.created_by_id", remote_side="User.id")
+    last_modified_by_user = relationship("User", foreign_keys="User.last_modified_by_id", remote_side="User.id")
+    deleted_by_user = relationship("User", foreign_keys="User.deleted_by_id", remote_side="User.id")

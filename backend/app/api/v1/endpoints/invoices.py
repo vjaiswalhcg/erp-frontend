@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,68 @@ from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
 
+def map_invoice_to_out(invoice: Invoice) -> dict[str, Any]:
+    """Map invoice model to output dict with user relationships"""
+    from app.schemas.invoice import InvoiceLineOut
+    from app.schemas.customer import CustomerOut
+    
+    # Build lines
+    lines_data = []
+    if invoice.lines:
+        for line in invoice.lines:
+            line_dict = {
+                "id": line.id,
+                "product_id": line.product_id,
+                "description": line.description,
+                "quantity": float(line.quantity),
+                "unit_price": float(line.unit_price),
+                "tax_rate": float(line.tax_rate),
+                "line_total": float(line.line_total),
+                "created_at": line.created_at,
+            }
+            if line.product:
+                from app.schemas.product import ProductOut
+                line_dict["product"] = ProductOut.from_orm(line.product).dict()
+            lines_data.append(line_dict)
+    
+    data = {
+        "id": invoice.id,
+        "external_ref": invoice.external_ref,
+        "order_id": invoice.order_id,
+        "customer_id": invoice.customer_id,
+        "invoice_date": invoice.invoice_date,
+        "due_date": invoice.due_date,
+        "status": invoice.status,
+        "currency": invoice.currency,
+        "subtotal": float(invoice.subtotal),
+        "tax_total": float(invoice.tax_total),
+        "total": float(invoice.total),
+        "notes": invoice.notes,
+        "lines": lines_data,
+        "created_at": invoice.created_at,
+        "updated_at": invoice.updated_at,
+        "created_by_id": invoice.created_by_id,
+        "last_modified_by_id": invoice.last_modified_by_id,
+        "owner_id": invoice.owner_id,
+        "is_deleted": invoice.is_deleted,
+        "deleted_at": invoice.deleted_at,
+        "deleted_by_id": invoice.deleted_by_id,
+    }
+    # Map user relationships
+    if invoice.created_by_user:
+        data["created_by"] = invoice.created_by_user
+    if invoice.last_modified_by_user:
+        data["last_modified_by"] = invoice.last_modified_by_user
+    if invoice.owner_user:
+        data["owner"] = invoice.owner_user
+    if invoice.deleted_by_user:
+        data["deleted_by"] = invoice.deleted_by_user
+    # Map customer if loaded
+    if invoice.customer:
+        data["customer"] = CustomerOut.from_orm(invoice.customer).dict()
+    return data
+
+
 @router.get("/", response_model=list[InvoiceOut])
 async def list_invoices(
     db: AsyncSession = Depends(deps.get_session),
@@ -31,12 +94,17 @@ async def list_invoices(
         selectinload(Invoice.lines),
         selectinload(Invoice.customer),
         selectinload(Invoice.lines).selectinload(InvoiceLine.product),
+        selectinload(Invoice.created_by_user),
+        selectinload(Invoice.last_modified_by_user),
+        selectinload(Invoice.owner_user),
+        selectinload(Invoice.deleted_by_user),
     )
     if not include_deleted:
         query = query.where(Invoice.is_deleted == False)
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
-    return result.scalars().unique().all()
+    invoices = result.scalars().unique().all()
+    return [InvoiceOut(**map_invoice_to_out(invoice)) for invoice in invoices]
 
 
 @router.post("/", response_model=InvoiceOut)

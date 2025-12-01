@@ -58,10 +58,14 @@ class UserOut(UserBase):
     updated_at: datetime
     created_by_id: uuid.UUID | None = None
     last_modified_by_id: uuid.UUID | None = None
+    # User objects for display (self-referential)
+    created_by: UserInfo | None = None
+    last_modified_by: UserInfo | None = None
     # Soft delete fields
     is_deleted: bool = False
     deleted_at: datetime | None = None
     deleted_by_id: uuid.UUID | None = None
+    deleted_by: UserInfo | None = None
 
     class Config:
         orm_mode = True

@@ -32,3 +32,9 @@ class Product(Base, AuditMixin, SoftDeleteMixin):
     # Relationships
     order_lines = relationship("OrderLine", back_populates="product")
     invoice_lines = relationship("InvoiceLine", back_populates="product")
+    
+    # User relationships for audit fields
+    created_by_user = relationship("User", foreign_keys="Product.created_by_id", remote_side="User.id")
+    last_modified_by_user = relationship("User", foreign_keys="Product.last_modified_by_id", remote_side="User.id")
+    owner_user = relationship("User", foreign_keys="Product.owner_id", remote_side="User.id")
+    deleted_by_user = relationship("User", foreign_keys="Product.deleted_by_id", remote_side="User.id")

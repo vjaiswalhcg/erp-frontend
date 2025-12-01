@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, validator
 from app.models.order import OrderStatus
 from app.schemas.customer import CustomerOut
 from app.schemas.product import ProductOut
+from app.schemas.user import UserInfo
 
 
 class OrderLineCreate(BaseModel):
@@ -105,10 +106,15 @@ class OrderOut(OrderBase):
     created_by_id: uuid.UUID | None = None
     last_modified_by_id: uuid.UUID | None = None
     owner_id: uuid.UUID | None = None
+    # User objects for display
+    created_by: UserInfo | None = None
+    last_modified_by: UserInfo | None = None
+    owner: UserInfo | None = None
     # Soft delete fields
     is_deleted: bool = False
     deleted_at: datetime | None = None
     deleted_by_id: uuid.UUID | None = None
+    deleted_by: UserInfo | None = None
 
     class Config:
         orm_mode = True

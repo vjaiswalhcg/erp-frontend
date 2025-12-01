@@ -32,6 +32,14 @@ function formatDateTime(dateString: string | null | undefined): string {
   return new Date(dateString).toLocaleString();
 }
 
+function getUserDisplayName(user: { first_name?: string | null; last_name?: string | null; email: string } | null | undefined): string {
+  if (!user) return "System";
+  if (user.first_name || user.last_name) {
+    return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  }
+  return user.email;
+}
+
 function InfoRow({
   icon: Icon,
   label,
@@ -170,17 +178,17 @@ export function ProductViewDialog({
               <InfoRow
                 icon={UserCircle}
                 label="Created By"
-                value={product.created_by_id || "System"}
+                value={getUserDisplayName(product.created_by)}
               />
               <InfoRow
                 icon={UserCircle}
                 label="Last Modified By"
-                value={product.last_modified_by_id || "System"}
+                value={getUserDisplayName(product.last_modified_by)}
               />
               <InfoRow
                 icon={Shield}
                 label="Owner"
-                value={product.owner_id || "Unassigned"}
+                value={product.owner ? getUserDisplayName(product.owner) : "Unassigned"}
               />
             </div>
           </Section>
@@ -197,7 +205,7 @@ export function ProductViewDialog({
                 <InfoRow
                   icon={UserCircle}
                   label="Deleted By"
-                  value={product.deleted_by_id || "System"}
+                  value={getUserDisplayName(product.deleted_by)}
                 />
               </div>
             </Section>

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from typing import Any
 
 from app.api import deps
 from app.api.deps import set_audit_fields_on_create, set_audit_fields_on_update, set_soft_delete_fields
@@ -9,6 +11,39 @@ from app.core.security import get_current_user
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductOut, ProductUpdate
+
+
+def map_product_to_out(product: Product) -> dict[str, Any]:
+    """Map product model to output dict with user relationships"""
+    data = {
+        "id": product.id,
+        "external_ref": product.external_ref,
+        "sku": product.sku,
+        "name": product.name,
+        "description": product.description,
+        "uom": product.uom,
+        "price": float(product.price),
+        "tax_code": product.tax_code,
+        "is_active": product.is_active,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+        "created_by_id": product.created_by_id,
+        "last_modified_by_id": product.last_modified_by_id,
+        "owner_id": product.owner_id,
+        "is_deleted": product.is_deleted,
+        "deleted_at": product.deleted_at,
+        "deleted_by_id": product.deleted_by_id,
+    }
+    # Map user relationships
+    if product.created_by_user:
+        data["created_by"] = product.created_by_user
+    if product.last_modified_by_user:
+        data["last_modified_by"] = product.last_modified_by_user
+    if product.owner_user:
+        data["owner"] = product.owner_user
+    if product.deleted_by_user:
+        data["deleted_by"] = product.deleted_by_user
+    return data
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
@@ -21,12 +56,21 @@ async def list_products(
     include_deleted: bool = Query(default=False, description="Include soft-deleted records"),
 ):
     """List all products. By default excludes soft-deleted records."""
-    query = select(Product)
+    query = (
+        select(Product)
+        .options(
+            selectinload(Product.created_by_user),
+            selectinload(Product.last_modified_by_user),
+            selectinload(Product.owner_user),
+            selectinload(Product.deleted_by_user),
+        )
+    )
     if not include_deleted:
         query = query.where(Product.is_deleted == False)
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    products = result.scalars().all()
+    return [ProductOut(**map_product_to_out(product)) for product in products]
 
 
 @router.post("/", response_model=ProductOut)
@@ -48,18 +92,28 @@ async def create_product(
     
     db.add(product)
     await db.commit()
-    await db.refresh(product)
-    return product
+    await db.refresh(product, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return ProductOut(**map_product_to_out(product))
 
 
 @router.get("/{product_id}", response_model=ProductOut)
 async def get_product(product_id: str, db: AsyncSession = Depends(deps.get_session)):
     """Get a product by ID."""
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    query = (
+        select(Product)
+        .options(
+            selectinload(Product.created_by_user),
+            selectinload(Product.last_modified_by_user),
+            selectinload(Product.owner_user),
+            selectinload(Product.deleted_by_user),
+        )
+        .where(Product.id == product_id)
+    )
+    result = await db.execute(query)
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    return ProductOut(**map_product_to_out(product))
 
 
 @router.put("/{product_id}", response_model=ProductOut)
@@ -70,7 +124,17 @@ async def update_product(
     current_user: User = Depends(get_current_user),
 ):
     """Update a product with audit trail."""
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    query = (
+        select(Product)
+        .options(
+            selectinload(Product.created_by_user),
+            selectinload(Product.last_modified_by_user),
+            selectinload(Product.owner_user),
+            selectinload(Product.deleted_by_user),
+        )
+        .where(Product.id == product_id)
+    )
+    result = await db.execute(query)
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -85,8 +149,8 @@ async def update_product(
     set_audit_fields_on_update(product, current_user)
     
     await db.commit()
-    await db.refresh(product)
-    return product
+    await db.refresh(product, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return ProductOut(**map_product_to_out(product))
 
 
 @router.delete("/{product_id}", status_code=204)
@@ -123,7 +187,17 @@ async def restore_product(
     current_user: User = Depends(get_current_user),
 ):
     """Restore a soft-deleted product."""
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    query = (
+        select(Product)
+        .options(
+            selectinload(Product.created_by_user),
+            selectinload(Product.last_modified_by_user),
+            selectinload(Product.owner_user),
+            selectinload(Product.deleted_by_user),
+        )
+        .where(Product.id == product_id)
+    )
+    result = await db.execute(query)
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -137,5 +211,5 @@ async def restore_product(
     set_audit_fields_on_update(product, current_user)
     
     await db.commit()
-    await db.refresh(product)
-    return product
+    await db.refresh(product, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return ProductOut(**map_product_to_out(product))

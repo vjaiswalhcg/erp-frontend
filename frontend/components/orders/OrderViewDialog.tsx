@@ -42,6 +42,14 @@ function formatDateTime(dateString: string | null | undefined): string {
   return new Date(dateString).toLocaleString();
 }
 
+function getUserDisplayName(user: { first_name?: string | null; last_name?: string | null; email: string } | null | undefined): string {
+  if (!user) return "System";
+  if (user.first_name || user.last_name) {
+    return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  }
+  return user.email;
+}
+
 function InfoRow({
   icon: Icon,
   label,
@@ -207,9 +215,9 @@ export function OrderViewDialog({
             <div className="grid grid-cols-2 gap-x-4">
               <InfoRow icon={Calendar} label="Created At" value={formatDateTime(order.created_at)} />
               <InfoRow icon={Clock} label="Last Modified At" value={formatDateTime(order.updated_at)} />
-              <InfoRow icon={UserCircle} label="Created By" value={order.created_by_id || "System"} />
-              <InfoRow icon={UserCircle} label="Last Modified By" value={order.last_modified_by_id || "System"} />
-              <InfoRow icon={Shield} label="Owner" value={order.owner_id || "Unassigned"} />
+              <InfoRow icon={UserCircle} label="Created By" value={getUserDisplayName(order.created_by)} />
+              <InfoRow icon={UserCircle} label="Last Modified By" value={getUserDisplayName(order.last_modified_by)} />
+              <InfoRow icon={Shield} label="Owner" value={order.owner ? getUserDisplayName(order.owner) : "Unassigned"} />
             </div>
           </Section>
 
@@ -218,7 +226,7 @@ export function OrderViewDialog({
             <Section title="Deletion Information">
               <div className="grid grid-cols-2 gap-x-4">
                 <InfoRow icon={Calendar} label="Deleted At" value={formatDateTime(order.deleted_at)} />
-                <InfoRow icon={UserCircle} label="Deleted By" value={order.deleted_by_id || "System"} />
+                <InfoRow icon={UserCircle} label="Deleted By" value={getUserDisplayName(order.deleted_by)} />
               </div>
             </Section>
           )}
