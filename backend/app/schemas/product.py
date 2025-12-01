@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 
 class ProductBase(BaseModel):
+    external_ref: str | None = None
     sku: str
     name: str
     description: str | None = None
@@ -17,6 +18,7 @@ class ProductCreate(ProductBase):
 
 
 class ProductUpdate(BaseModel):
+    external_ref: str | None = None
     name: str | None = None
     description: str | None = None
     uom: str | None = None
