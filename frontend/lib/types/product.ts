@@ -20,6 +20,7 @@ export interface ProductCreate extends AuditFieldsCreate {
   description?: string;
   uom?: string;
   price: number;
+  currency?: string;
   tax_code?: string;
   is_active?: boolean;
 }
@@ -31,6 +32,7 @@ export interface ProductUpdate extends AuditFieldsUpdate {
   description?: string;
   uom?: string;
   price?: number;
+  currency?: string;
   tax_code?: string;
   is_active?: boolean;
 }
