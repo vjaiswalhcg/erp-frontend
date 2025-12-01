@@ -35,14 +35,17 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Eye,
 } from "lucide-react";
 import { InvoiceDialog } from "./InvoiceDialog";
+import { InvoiceViewDialog } from "./InvoiceViewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/utils";
 
 export function InvoiceTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -79,6 +82,11 @@ export function InvoiceTable() {
       });
     },
   });
+
+  const handleView = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsViewDialogOpen(true);
+  };
 
   const handleEdit = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -438,12 +446,22 @@ export function InvoiceTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(invoice)}
+                        className="h-8 w-8 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(invoice)}
                           className="h-8 w-8 hover:bg-teal-100 hover:text-teal-600 dark:hover:bg-teal-900/30"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -455,6 +473,7 @@ export function InvoiceTable() {
                           onClick={() => handleDelete(invoice.id)}
                           disabled={deleteMutation.isPending}
                           className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -561,6 +580,12 @@ export function InvoiceTable() {
         invoice={selectedInvoice}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      <InvoiceViewDialog
+        invoice={selectedInvoice}
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
       />
     </div>
   );

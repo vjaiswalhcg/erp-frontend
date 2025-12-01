@@ -31,13 +31,16 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { CustomerDialog } from "./CustomerDialog";
+import { CustomerViewDialog } from "./CustomerViewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 
 export function CustomerTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
   );
@@ -76,6 +79,11 @@ export function CustomerTable() {
       });
     },
   });
+
+  const handleView = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsViewDialogOpen(true);
+  };
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -393,12 +401,22 @@ export function CustomerTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(customer)}
+                        className="h-8 w-8 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(customer)}
                           className="h-8 w-8 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -410,6 +428,7 @@ export function CustomerTable() {
                           onClick={() => handleDelete(customer.id)}
                           disabled={deleteMutation.isPending}
                           className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -516,6 +535,12 @@ export function CustomerTable() {
         customer={selectedCustomer}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      <CustomerViewDialog
+        customer={selectedCustomer}
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
       />
     </div>
   );

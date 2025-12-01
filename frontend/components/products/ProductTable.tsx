@@ -32,14 +32,17 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
+  Eye,
 } from "lucide-react";
 import { ProductDialog } from "./ProductDialog";
+import { ProductViewDialog } from "./ProductViewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/utils";
 
 export function ProductTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -74,6 +77,11 @@ export function ProductTable() {
       });
     },
   });
+
+  const handleView = (product: Product) => {
+    setSelectedProduct(product);
+    setIsViewDialogOpen(true);
+  };
 
   const handleEdit = (product: Product) => {
     setSelectedProduct(product);
@@ -402,12 +410,22 @@ export function ProductTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(product)}
+                        className="h-8 w-8 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(product)}
                           className="h-8 w-8 hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-900/30"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -419,6 +437,7 @@ export function ProductTable() {
                           onClick={() => handleDelete(product.id)}
                           disabled={deleteMutation.isPending}
                           className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -525,6 +544,12 @@ export function ProductTable() {
         product={selectedProduct}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      <ProductViewDialog
+        product={selectedProduct}
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
       />
     </div>
   );

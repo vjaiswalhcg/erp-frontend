@@ -34,14 +34,17 @@ import {
   DollarSign,
   Clock,
   CheckCircle,
+  Eye,
 } from "lucide-react";
 import { OrderDialog } from "./OrderDialog";
+import { OrderViewDialog } from "./OrderViewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export function OrderTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -77,6 +80,11 @@ export function OrderTable() {
       });
     },
   });
+
+  const handleView = (order: Order) => {
+    setSelectedOrder(order);
+    setIsViewDialogOpen(true);
+  };
 
   const handleEdit = (order: Order) => {
     setSelectedOrder(order);
@@ -412,12 +420,22 @@ export function OrderTable() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(order)}
+                        className="h-8 w-8 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(order)}
                           className="h-8 w-8 hover:bg-orange-100 hover:text-orange-600 dark:hover:bg-orange-900/30"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -429,6 +447,7 @@ export function OrderTable() {
                           onClick={() => handleDelete(order.id)}
                           disabled={deleteMutation.isPending}
                           className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -533,6 +552,12 @@ export function OrderTable() {
         order={selectedOrder}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      <OrderViewDialog
+        order={selectedOrder}
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
       />
     </div>
   );

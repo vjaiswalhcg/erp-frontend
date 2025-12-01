@@ -35,14 +35,17 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Eye,
 } from "lucide-react";
 import { PaymentDialog } from "./PaymentDialog";
+import { PaymentViewDialog } from "./PaymentViewDialog";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/utils";
 
 export function PaymentTable() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -79,6 +82,11 @@ export function PaymentTable() {
       });
     },
   });
+
+  const handleView = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setIsViewDialogOpen(true);
+  };
 
   const handleEdit = (payment: Payment) => {
     setSelectedPayment(payment);
@@ -436,12 +444,22 @@ export function PaymentTable() {
                   <TableCell>{getStatusBadge(payment.status)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleView(payment)}
+                        className="h-8 w-8 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       {canEdit && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleEdit(payment)}
                           className="h-8 w-8 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/30"
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -453,6 +471,7 @@ export function PaymentTable() {
                           onClick={() => handleDelete(payment.id)}
                           disabled={deleteMutation.isPending}
                           className="h-8 w-8 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -559,6 +578,12 @@ export function PaymentTable() {
         payment={selectedPayment}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      <PaymentViewDialog
+        payment={selectedPayment}
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
       />
     </div>
   );
