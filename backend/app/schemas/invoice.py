@@ -23,7 +23,7 @@ class InvoiceLineOut(InvoiceLineCreate):
     created_at: datetime | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class InvoiceBase(BaseModel):
@@ -118,7 +118,7 @@ class InvoiceOut(InvoiceBase):
     deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class InvoiceStatusUpdate(BaseModel):

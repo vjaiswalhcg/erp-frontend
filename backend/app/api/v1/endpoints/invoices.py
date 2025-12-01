@@ -90,7 +90,7 @@ async def create_invoice(
         if isinstance(line, dict):
             normalized.append(line)
         else:
-            normalized.append(line.model_dump())
+            normalized.append(line.dict())
 
     for line in normalized:
         product_id = line.get("product_id")

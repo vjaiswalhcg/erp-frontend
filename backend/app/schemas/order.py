@@ -22,7 +22,7 @@ class OrderLineOut(OrderLineCreate):
     created_at: datetime | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class OrderBase(BaseModel):
@@ -111,7 +111,7 @@ class OrderOut(OrderBase):
     deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class OrderUpdateStatus(BaseModel):

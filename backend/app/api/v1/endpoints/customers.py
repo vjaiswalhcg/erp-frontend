@@ -37,7 +37,7 @@ async def create_customer(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new customer with audit trail."""
-    data = payload.model_dump(exclude_unset=True)
+    data = payload.dict(exclude_unset=True)
     customer = Customer(**data)
     
     # Set audit fields
@@ -79,7 +79,7 @@ async def update_customer(
     if customer.is_deleted:
         raise HTTPException(status_code=400, detail="Cannot update a deleted customer")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in payload.dict(exclude_unset=True).items():
         setattr(customer, field, value)
     
     # Set audit fields

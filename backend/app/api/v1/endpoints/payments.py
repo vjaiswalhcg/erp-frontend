@@ -53,7 +53,7 @@ async def create_payment(
         if not invoice:
             raise HTTPException(status_code=400, detail="Invalid invoice")
 
-    data = payload.model_dump(exclude_unset=True)
+    data = payload.dict(exclude_unset=True)
     payment = Payment(**data)
     
     # Set audit fields

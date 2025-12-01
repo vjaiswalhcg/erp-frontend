@@ -47,4 +47,4 @@ class CustomerOut(CustomerBase):
     deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True

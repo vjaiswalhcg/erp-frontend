@@ -91,7 +91,7 @@ class PaymentOut(PaymentBase):
     deleted_by_id: uuid.UUID | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class PaymentApplicationCreate(BaseModel):
@@ -105,7 +105,7 @@ class PaymentApplicationOut(PaymentApplicationCreate):
     created_at: datetime | None = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 
 class PaymentStatusUpdate(BaseModel):
