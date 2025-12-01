@@ -33,3 +33,9 @@ class Customer(Base, AuditMixin, SoftDeleteMixin):
     orders = relationship("Order", back_populates="customer", cascade="all,delete")
     invoices = relationship("Invoice", back_populates="customer", cascade="all,delete")
     payments = relationship("Payment", back_populates="customer", cascade="all,delete")
+    
+    # User relationships for audit fields
+    created_by_user = relationship("User", foreign_keys="Customer.created_by_id", remote_side="User.id")
+    last_modified_by_user = relationship("User", foreign_keys="Customer.last_modified_by_id", remote_side="User.id")
+    owner_user = relationship("User", foreign_keys="Customer.owner_id", remote_side="User.id")
+    deleted_by_user = relationship("User", foreign_keys="Customer.deleted_by_id", remote_side="User.id")

@@ -38,6 +38,14 @@ function formatDate(dateString: string | null | undefined): string {
   return new Date(dateString).toLocaleDateString();
 }
 
+function getUserDisplayName(user: { first_name?: string | null; last_name?: string | null; email: string } | null | undefined): string {
+  if (!user) return "System";
+  if (user.first_name || user.last_name) {
+    return `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  }
+  return user.email;
+}
+
 function InfoRow({
   icon: Icon,
   label,
@@ -170,17 +178,17 @@ export function CustomerViewDialog({
               <InfoRow
                 icon={UserCircle}
                 label="Created By"
-                value={customer.created_by_id || "System"}
+                value={getUserDisplayName(customer.created_by)}
               />
               <InfoRow
                 icon={UserCircle}
                 label="Last Modified By"
-                value={customer.last_modified_by_id || "System"}
+                value={getUserDisplayName(customer.last_modified_by)}
               />
               <InfoRow
                 icon={Shield}
                 label="Owner"
-                value={customer.owner_id || "Unassigned"}
+                value={customer.owner ? getUserDisplayName(customer.owner) : "Unassigned"}
               />
             </div>
           </Section>
@@ -197,7 +205,7 @@ export function CustomerViewDialog({
                 <InfoRow
                   icon={UserCircle}
                   label="Deleted By"
-                  value={customer.deleted_by_id || "System"}
+                  value={getUserDisplayName(customer.deleted_by)}
                 />
               </div>
             </Section>

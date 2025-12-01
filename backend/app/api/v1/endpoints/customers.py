@@ -2,6 +2,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from typing import Any
 
 from app.api import deps
 from app.api.deps import set_audit_fields_on_create, set_audit_fields_on_update, set_soft_delete_fields
@@ -10,6 +12,39 @@ from app.core.security import get_current_user
 from app.models.customer import Customer
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerOut, CustomerUpdate
+
+
+def map_customer_to_out(customer: Customer) -> dict[str, Any]:
+    """Map customer model to output dict with user relationships"""
+    data = {
+        "id": customer.id,
+        "external_ref": customer.external_ref,
+        "name": customer.name,
+        "email": customer.email,
+        "phone": customer.phone,
+        "billing_address": customer.billing_address,
+        "shipping_address": customer.shipping_address,
+        "currency": customer.currency,
+        "is_active": customer.is_active,
+        "created_at": customer.created_at,
+        "updated_at": customer.updated_at,
+        "created_by_id": customer.created_by_id,
+        "last_modified_by_id": customer.last_modified_by_id,
+        "owner_id": customer.owner_id,
+        "is_deleted": customer.is_deleted,
+        "deleted_at": customer.deleted_at,
+        "deleted_by_id": customer.deleted_by_id,
+    }
+    # Map user relationships
+    if customer.created_by_user:
+        data["created_by"] = customer.created_by_user
+    if customer.last_modified_by_user:
+        data["last_modified_by"] = customer.last_modified_by_user
+    if customer.owner_user:
+        data["owner"] = customer.owner_user
+    if customer.deleted_by_user:
+        data["deleted_by"] = customer.deleted_by_user
+    return data
 
 router = APIRouter(dependencies=[Depends(deps.get_auth)])
 
@@ -22,12 +57,21 @@ async def list_customers(
     include_deleted: bool = Query(default=False, description="Include soft-deleted records"),
 ):
     """List all customers. By default excludes soft-deleted records."""
-    query = select(Customer)
+    query = (
+        select(Customer)
+        .options(
+            selectinload(Customer.created_by_user),
+            selectinload(Customer.last_modified_by_user),
+            selectinload(Customer.owner_user),
+            selectinload(Customer.deleted_by_user),
+        )
+    )
     if not include_deleted:
         query = query.where(Customer.is_deleted == False)
     query = query.offset(offset).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    customers = result.scalars().all()
+    return [CustomerOut(**map_customer_to_out(customer)) for customer in customers]
 
 
 @router.post("/", response_model=CustomerOut)
@@ -49,18 +93,28 @@ async def create_customer(
     
     db.add(customer)
     await db.commit()
-    await db.refresh(customer)
-    return customer
+    await db.refresh(customer, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return CustomerOut(**map_customer_to_out(customer))
 
 
 @router.get("/{customer_id}", response_model=CustomerOut)
 async def get_customer(customer_id: str, db: AsyncSession = Depends(deps.get_session)):
     """Get a customer by ID."""
-    result = await db.execute(select(Customer).where(Customer.id == customer_id))
+    query = (
+        select(Customer)
+        .options(
+            selectinload(Customer.created_by_user),
+            selectinload(Customer.last_modified_by_user),
+            selectinload(Customer.owner_user),
+            selectinload(Customer.deleted_by_user),
+        )
+        .where(Customer.id == customer_id)
+    )
+    result = await db.execute(query)
     customer = result.scalar_one_or_none()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    return customer
+    return CustomerOut(**map_customer_to_out(customer))
 
 
 @router.put("/{customer_id}", response_model=CustomerOut)
@@ -71,7 +125,17 @@ async def update_customer(
     current_user: User = Depends(get_current_user),
 ):
     """Update a customer with audit trail."""
-    result = await db.execute(select(Customer).where(Customer.id == customer_id))
+    query = (
+        select(Customer)
+        .options(
+            selectinload(Customer.created_by_user),
+            selectinload(Customer.last_modified_by_user),
+            selectinload(Customer.owner_user),
+            selectinload(Customer.deleted_by_user),
+        )
+        .where(Customer.id == customer_id)
+    )
+    result = await db.execute(query)
     customer = result.scalar_one_or_none()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -86,8 +150,8 @@ async def update_customer(
     set_audit_fields_on_update(customer, current_user)
     
     await db.commit()
-    await db.refresh(customer)
-    return customer
+    await db.refresh(customer, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return CustomerOut(**map_customer_to_out(customer))
 
 
 @router.delete("/{customer_id}", status_code=204)
@@ -138,5 +202,5 @@ async def restore_customer(
     set_audit_fields_on_update(customer, current_user)
     
     await db.commit()
-    await db.refresh(customer)
-    return customer
+    await db.refresh(customer, ["created_by_user", "last_modified_by_user", "owner_user", "deleted_by_user"])
+    return CustomerOut(**map_customer_to_out(customer))
