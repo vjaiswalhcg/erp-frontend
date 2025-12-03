@@ -35,3 +35,11 @@ export interface UserUpdate {
   last_name?: string;
   phone?: string;
 }
+
+export interface UserInfo {
+  id: string;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  full_name?: string | null;
+}

@@ -6,12 +6,19 @@ from app.api import deps
 from app.core import auth
 from app.core.security import require_roles
 from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserOut, UserUpdate
+from app.schemas.user import UserCreate, UserOut, UserUpdate, UserInfo
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
     dependencies=[Depends(require_roles([UserRole.admin]))],
+)
+
+# Public router for non-admin endpoints (only requires authentication)
+public_router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+    dependencies=[Depends(deps.get_auth)],
 )
 
 
@@ -80,3 +87,13 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@public_router.get("/list-names", response_model=list[UserInfo])
+async def list_user_names(db: AsyncSession = Depends(deps.get_session)):
+    """
+    Public endpoint for user selection in forms (name/email only).
+    Returns only active users for owner/assignment dropdowns.
+    """
+    result = await db.execute(select(User).where(User.is_active == True))
+    return result.scalars().all()

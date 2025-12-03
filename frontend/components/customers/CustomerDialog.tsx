@@ -4,9 +4,11 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { customersApi } from "@/lib/api/customers";
+import { usersApi } from "@/lib/api/users";
 import { Customer, CustomerCreate } from "@/lib/types/customer";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,7 @@ const customerSchema = z.object({
   billing_address: z.string().optional(),
   shipping_address: z.string().optional(),
   currency: z.string().default("USD"),
+  owner_id: z.string().optional(),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -50,6 +53,12 @@ export function CustomerDialog({
 }: CustomerDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: users } = useQuery({
+    queryKey: ["users-names"],
+    queryFn: usersApi.listNames,
+  });
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
@@ -61,6 +70,7 @@ export function CustomerDialog({
       billing_address: "",
       shipping_address: "",
       currency: "USD",
+      owner_id: user?.id || "",
     },
   });
 
@@ -74,6 +84,7 @@ export function CustomerDialog({
         billing_address: customer.billing_address || "",
         shipping_address: customer.shipping_address || "",
         currency: customer.currency,
+        owner_id: customer.owner_id || "",
       });
     } else {
       form.reset({
@@ -84,9 +95,10 @@ export function CustomerDialog({
         billing_address: "",
         shipping_address: "",
         currency: "USD",
+        owner_id: user?.id || "",
       });
     }
-  }, [customer, form]);
+  }, [customer, form, user]);
 
   const createMutation = useMutation({
     mutationFn: customersApi.create,
@@ -136,6 +148,7 @@ export function CustomerDialog({
       billing_address: data.billing_address || undefined,
       shipping_address: data.shipping_address || undefined,
       currency: data.currency,
+      owner_id: data.owner_id || undefined,
     };
 
     if (customer) {
@@ -228,6 +241,27 @@ export function CustomerDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="owner_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Owner</FormLabel>
+                  <FormControl>
+                    <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
+                      <option value="">Select owner (defaults to you)</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.full_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

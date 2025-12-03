@@ -8,7 +8,9 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { paymentsApi } from "@/lib/api/payments";
 import { customersApi } from "@/lib/api/customers";
 import { invoicesApi } from "@/lib/api/invoices";
+import { usersApi } from "@/lib/api/users";
 import { Payment, PaymentCreate, PaymentUpdate } from "@/lib/types/payment";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,7 @@ const paymentSchema = z.object({
   method: z.string().optional(),
   note: z.string().optional(),
   invoice_id: z.string().optional(),
+  owner_id: z.string().optional(),
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
@@ -49,6 +52,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [apiError, setApiError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -58,6 +62,11 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
   const { data: invoices } = useQuery({
     queryKey: ["invoices"],
     queryFn: invoicesApi.list,
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ["users-names"],
+    queryFn: usersApi.listNames,
   });
 
   const form = useForm<PaymentFormValues>({
@@ -70,6 +79,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
       method: "",
       note: "",
       invoice_id: "",
+      owner_id: user?.id || "",
     },
   });
 
@@ -83,6 +93,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
         method: "",
         note: "",
         invoice_id: "",
+        owner_id: user?.id || "",
       });
       setApiError(null);
       return;
@@ -95,9 +106,10 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
       method: payment.method || "",
       note: payment.note || "",
       invoice_id: payment.invoice_id || "",
+      owner_id: payment.owner_id || "",
     });
     setApiError(null);
-  }, [payment, form]);
+  }, [payment, form, user]);
 
   const createMutation = useMutation({
     mutationFn: (payload: PaymentCreate | PaymentUpdate) =>
@@ -157,6 +169,7 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
       currency: data.currency,
       method: data.method || undefined,
       note: data.note || undefined,
+      owner_id: data.owner_id || undefined,
     };
 
     createMutation.mutate(payload);
@@ -273,6 +286,27 @@ export function PaymentDialog({ payment, open, onOpenChange }: PaymentDialogProp
                       {invoices?.map((inv) => (
                         <option key={inv.id} value={inv.id}>
                           {inv.customer?.name} - {new Date(inv.invoice_date).toLocaleDateString()} - ${inv.total}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="owner_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Owner</FormLabel>
+                  <FormControl>
+                    <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
+                      <option value="">Select owner (defaults to you)</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.full_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email}
                         </option>
                       ))}
                     </select>

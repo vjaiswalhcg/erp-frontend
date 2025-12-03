@@ -8,7 +8,9 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { ordersApi } from "@/lib/api/orders";
 import { customersApi } from "@/lib/api/customers";
 import { productsApi } from "@/lib/api/products";
+import { usersApi } from "@/lib/api/users";
 import { Order, OrderCreate, OrderUpdate } from "@/lib/types/order";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,7 @@ const orderSchema = z.object({
   currency: z.string().default("USD"),
   notes: z.string().optional(),
   lines: z.array(lineItemSchema).min(1, "At least one line item is required"),
+  owner_id: z.string().optional(),
 });
 
 type OrderFormValues = z.infer<typeof orderSchema>;
@@ -57,6 +60,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [apiError, setApiError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -68,6 +72,11 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
     queryFn: productsApi.list,
   });
 
+  const { data: users } = useQuery({
+    queryKey: ["users-names"],
+    queryFn: usersApi.listNames,
+  });
+
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
@@ -77,6 +86,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       currency: "USD",
       notes: "",
       lines: [{ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
+      owner_id: user?.id || "",
     },
   });
 
@@ -94,6 +104,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
         currency: "USD",
         notes: "",
         lines: [{ product_id: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
+        owner_id: user?.id || "",
       });
       return;
     }
@@ -114,9 +125,10 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       currency: order.currency,
       notes: order.notes || "",
       lines,
+      owner_id: order.owner_id || "",
     });
     setApiError(null);
-  }, [order, form]);
+  }, [order, form, user]);
 
   const mutation = useMutation({
     mutationFn: (payload: OrderCreate | OrderUpdate) =>
@@ -165,6 +177,7 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
       currency: data.currency,
       notes: data.notes,
       lines: data.lines,
+      owner_id: data.owner_id || undefined,
     };
     mutation.mutate(payload);
   };
@@ -248,6 +261,27 @@ export function OrderDialog({ order, open, onOpenChange }: OrderDialogProps) {
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="owner_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Owner</FormLabel>
+                  <FormControl>
+                    <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
+                      <option value="">Select owner (defaults to you)</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.full_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Line Items Section */}
             <div className="space-y-3">

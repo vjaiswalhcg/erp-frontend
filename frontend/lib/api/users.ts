@@ -1,5 +1,5 @@
 import apiClient from "./client";
-import { User } from "@/lib/types/user";
+import { User, UserInfo } from "@/lib/types/user";
 
 export interface UserCreatePayload {
   email: string;
@@ -23,6 +23,10 @@ export interface UserUpdatePayload {
 export const usersApi = {
   list: async (): Promise<User[]> => {
     const { data } = await apiClient.get<User[]>("/users/");
+    return data;
+  },
+  listNames: async (): Promise<UserInfo[]> => {
+    const { data } = await apiClient.get<UserInfo[]>("/users/list-names");
     return data;
   },
   create: async (payload: UserCreatePayload): Promise<User> => {

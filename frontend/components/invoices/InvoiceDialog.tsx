@@ -9,7 +9,9 @@ import { invoicesApi } from "@/lib/api/invoices";
 import { customersApi } from "@/lib/api/customers";
 import { ordersApi } from "@/lib/api/orders";
 import { productsApi } from "@/lib/api/products";
+import { usersApi } from "@/lib/api/users";
 import { Invoice, InvoiceCreate, InvoiceUpdate } from "@/lib/types/invoice";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +50,7 @@ const invoiceSchema = z.object({
   currency: z.string().default("USD"),
   notes: z.string().optional(),
   lines: z.array(lineItemSchema).min(1, "At least one line item is required"),
+  owner_id: z.string().optional(),
 });
 
 type InvoiceFormValues = z.infer<typeof invoiceSchema>;
@@ -62,6 +65,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [apiError, setApiError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const { data: customers } = useQuery({
     queryKey: ["customers"],
@@ -78,6 +82,11 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
     queryFn: productsApi.list,
   });
 
+  const { data: users } = useQuery({
+    queryKey: ["users-names"],
+    queryFn: usersApi.listNames,
+  });
+
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
@@ -90,6 +99,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
       currency: "USD",
       notes: "",
       lines: [{ product_id: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
+      owner_id: user?.id || "",
     },
   });
 
@@ -110,6 +120,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
         currency: "USD",
         notes: "",
         lines: [{ product_id: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0 }],
+        owner_id: user?.id || "",
       });
       setApiError(null);
       return;
@@ -135,9 +146,10 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
       currency: invoice.currency,
       notes: invoice.notes || "",
       lines,
+      owner_id: invoice.owner_id || "",
     });
     setApiError(null);
-  }, [invoice, form]);
+  }, [invoice, form, user]);
 
   const createMutation = useMutation({
     mutationFn: (payload: InvoiceCreate | InvoiceUpdate) =>
@@ -195,6 +207,7 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
         unit_price: line.unit_price,
         tax_rate: line.tax_rate,
       })),
+      owner_id: data.owner_id || undefined,
     };
     createMutation.mutate(payload);
   };
@@ -318,6 +331,27 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="owner_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Owner</FormLabel>
+                  <FormControl>
+                    <select {...field} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2">
+                      <option value="">Select owner (defaults to you)</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.full_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.email}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Line Items Section */}
             <div className="space-y-3">
