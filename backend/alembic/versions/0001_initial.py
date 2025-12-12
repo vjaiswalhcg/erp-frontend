@@ -90,7 +90,7 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "invoiceline",
+        "invoice_line",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column("invoice_id", sa.UUID(as_uuid=True), sa.ForeignKey("invoice.id")),
         sa.Column("product_id", sa.UUID(as_uuid=True), sa.ForeignKey("product.id")),
@@ -111,7 +111,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("paymentapplication")
-    op.drop_table("invoiceline")
+    op.drop_table("invoice_line")
     op.drop_table("orderline")
     op.drop_table("payment")
     op.drop_table("invoice")
